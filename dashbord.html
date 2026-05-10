@@ -1,0 +1,3214 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FN 経営ダッシュボード 2026｜Finance Navigator</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+/* ── Finance Navigator ブランドカラー ───────────────── */
+:root {
+  --navy:       #1C2D6B;  --navy2: #243580;  --navy-light: #3A5090;
+  --navy-pale:  #E8EBF4;  --orange: #F0A000; --orange-pale: #FEF6E0;
+  --white:      #FFFFFF;  --bg: #EFF1F7;     --border: #CDD2E8;
+  --text:       #1C2D6B;  --body: #374151;   --muted: #6B7280;
+  --red:        #C0392B;  --green: #1E7D4A;  --light-blue: #4A85C8;
+  --shadow: 0 1px 4px rgba(28,45,107,.10);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:'Hiragino Sans','Yu Gothic','Meiryo',sans-serif; font-size:12px; min-width:1000px; }
+
+/* ── Upload Overlay ────────────────────────────────── */
+#uploadOverlay {
+  position:fixed; inset:0; background:var(--navy);
+  display:flex; align-items:center; justify-content:center;
+  z-index:100; flex-direction:column; gap:24px;
+}
+.ov-logo { display:flex; align-items:center; gap:12px; margin-bottom:8px; }
+.ov-logo-circle { width:52px; height:52px; background:var(--orange); border-radius:50%; display:flex; align-items:center; justify-content:center; }
+.ov-logo-circle svg { fill:var(--navy); width:30px; height:30px; }
+.ov-brand { font-size:22px; font-weight:700; color:#fff; letter-spacing:1px; }
+.ov-sub { font-size:12px; color:rgba(255,255,255,.6); }
+.dropzone {
+  width:480px; border:2px dashed rgba(255,255,255,.35);
+  border-radius:12px; padding:48px 32px; text-align:center; cursor:pointer;
+  transition:border-color .2s, background .2s;
+}
+.dropzone:hover, .dropzone.dragging { border-color:var(--orange); background:rgba(240,160,0,.08); }
+.dropzone .dz-icon { font-size:48px; margin-bottom:12px; }
+.dropzone .dz-title { font-size:18px; font-weight:700; color:#fff; margin-bottom:6px; }
+.dropzone .dz-sub { font-size:12px; color:rgba(255,255,255,.6); line-height:1.8; }
+.btn-upload {
+  display:inline-block; background:var(--orange); color:var(--navy);
+  font-weight:700; font-size:14px; padding:12px 32px;
+  border-radius:6px; cursor:pointer; border:none; margin-top:16px;
+  font-family:inherit; transition:background .2s;
+}
+.btn-upload:hover { background:#F5BC40; }
+.ov-note { font-size:11px; color:rgba(255,255,255,.45); text-align:center; line-height:1.8; }
+
+/* ── Header ────────────────────────────────────────── */
+.hdr { background:var(--navy); padding:12px 24px; display:flex; justify-content:space-between; align-items:center; border-bottom:3px solid var(--orange); }
+.hdr-left { display:flex; align-items:center; gap:12px; }
+.hdr-logo { width:36px; height:36px; background:var(--orange); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.hdr-logo svg { fill:var(--navy); width:21px; height:21px; }
+.hdr-title { font-size:16px; font-weight:700; color:#fff; letter-spacing:.5px; }
+.hdr-sub { font-size:10px; color:rgba(255,255,255,.6); margin-top:2px; }
+.hdr-right { display:flex; align-items:center; gap:10px; }
+.hdr-badge { font-size:10px; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.3); padding:4px 10px; border-radius:4px; color:rgba(255,255,255,.85); }
+.btn-reload { font-size:11px; background:var(--orange); color:var(--navy); font-weight:700; padding:5px 14px; border-radius:4px; cursor:pointer; border:none; font-family:inherit; }
+.btn-reload:hover { background:#F5BC40; }
+
+/* ── Container & Grid ──────────────────────────────── */
+.wrap { padding:14px 18px; display:flex; flex-direction:column; gap:12px; }
+.kpi-row  { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; }
+.row-3-2  { display:grid; grid-template-columns:3fr 2fr; gap:12px; }
+.col-stack { display:flex; flex-direction:column; gap:12px; }
+
+/* ── KPI Cards ─────────────────────────────────────── */
+.kpi { background:var(--white); border-radius:6px; border:1px solid var(--border); padding:14px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden; }
+.kpi::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; background:var(--kc,var(--navy)); }
+.kpi-lbl { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.4px; margin-bottom:6px; }
+.kpi-val { font-size:24px; font-weight:700; color:var(--kc,var(--navy)); line-height:1; }
+.kpi-note { font-size:10px; color:var(--muted); margin-top:4px; }
+.kpi-bar { height:4px; background:var(--navy-pale); border-radius:2px; margin-top:9px; overflow:hidden; }
+.kpi-fill { height:100%; border-radius:2px; background:var(--kc,var(--navy)); transition:width .5s; }
+
+/* ── Card ──────────────────────────────────────────── */
+.card { background:var(--white); border-radius:6px; border:1px solid var(--border); box-shadow:var(--shadow); overflow:hidden; }
+.card-hdr { background:var(--navy); color:#fff; padding:9px 14px; display:flex; align-items:center; gap:8px; }
+.card-badge { width:19px; height:19px; background:var(--orange); color:var(--navy); border-radius:50%; font-size:9px; font-weight:700; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; }
+.card-title { font-size:11px; font-weight:600; }
+.card-body { padding:12px 14px; }
+
+/* ── Pipeline ②  ───────────────────────────────────── */
+.pipe-list { display:flex; flex-direction:column; gap:7px; }
+.pipe-row { display:flex; align-items:flex-start; gap:8px; }
+.pipe-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; margin-top:4px; }
+.pipe-info { flex:1; min-width:0; }
+.pipe-name { font-size:11px; color:var(--body); }
+.pipe-logic { font-size:9px; color:var(--muted); margin-top:1px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.pipe-inp { width:108px; flex-shrink:0; background:#F9FAFD; border:1px solid var(--border); border-radius:4px; padding:4px 7px; text-align:right; font-size:12px; font-family:inherit; color:var(--navy); transition:border-color .2s; }
+.pipe-inp:focus { outline:none; border-color:var(--orange); background:#fff; }
+.pipe-unit { font-size:10px; color:var(--muted); width:14px; flex-shrink:0; margin-top:4px; }
+.pipe-total-row { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:2px solid var(--navy); }
+.pipe-total-lbl { font-size:12px; font-weight:700; color:var(--navy); }
+.pipe-total-val { font-size:19px; font-weight:700; color:var(--orange); }
+
+/* ── Gap ③ ─────────────────────────────────────────── */
+.sc-item { margin-bottom:10px; }
+.sc-lbl { display:flex; justify-content:space-between; margin-bottom:3px; font-size:11px; }
+.sc-bar { height:14px; background:var(--navy-pale); border-radius:3px; overflow:hidden; }
+.sc-fill { height:100%; border-radius:3px; transition:width .5s; }
+.sc-note { font-size:10px; color:var(--muted); padding-top:9px; border-top:1px solid var(--border); margin-top:9px; line-height:1.8; }
+
+/* ── Project Hours ④ ───────────────────────────────── */
+.proj-summary { display:flex; background:var(--navy-pale); border-radius:6px; margin-bottom:12px; overflow:hidden; }
+.ps-item { flex:1; padding:11px 14px; text-align:center; border-right:1px solid var(--border); }
+.ps-item:last-child { border-right:none; flex:1.5; text-align:left; }
+.ps-val { font-size:24px; font-weight:700; }
+.ps-lbl { font-size:10px; color:var(--muted); margin-top:2px; }
+.ps-rate { font-size:10px; color:var(--muted); margin-top:6px; }
+.proj-inputs { display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px; padding:10px 12px; background:#F9FAFD; border-radius:5px; border:1px solid var(--border); }
+.proj-inp-group { display:flex; flex-direction:column; gap:3px; }
+.proj-inp-label { font-size:9px; color:var(--muted); }
+.proj-inp { width:70px; background:var(--white); border:1px solid var(--border); border-radius:4px; padding:4px 6px; text-align:right; font-size:12px; font-family:inherit; color:var(--navy); }
+.proj-inp:focus { outline:none; border-color:var(--orange); }
+.proj-inp-note { font-size:9px; color:var(--muted); }
+
+/* ── Gantt ⑤ ───────────────────────────────────────── */
+.gantt-outer { overflow-x:auto; }
+.gantt { border-collapse:collapse; min-width:100%; font-size:10px; }
+.gantt th { background:var(--navy); color:#fff; padding:3px 2px; text-align:center; border:1px solid var(--navy2); font-weight:600; }
+.gantt td { text-align:center; border:1px solid #D1D5DB; min-width:24px; height:27px; font-weight:600; font-size:10px; }
+.gantt .g-name { font-weight:700; color:var(--navy); background:var(--navy-pale); padding:4px 10px; text-align:left; white-space:nowrap; border-right:2px solid var(--navy); border:1px solid var(--border); font-size:11px; }
+.gantt .g-total { font-weight:700; color:var(--navy); background:var(--navy-pale); border:1px solid var(--border); }
+.gantt-legend { display:flex; flex-wrap:wrap; gap:14px; margin-top:8px; }
+.leg { display:flex; align-items:center; gap:5px; font-size:10px; color:var(--muted); }
+.leg-sw { width:16px; height:12px; border-radius:2px; }
+
+/* ── Tab bar（付箋タブ） ────────────────────────────── */
+.tab-bar {
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 20px 0;
+  border-bottom: 2px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  box-shadow: 0 3px 10px rgba(28,45,107,.08);
+}
+.tab-btn {
+  position: relative;
+  padding: 8px 26px 12px;
+  border: 2px solid #B4BBCF;
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  background: #C8CEDF;
+  color: #6B7280;
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transform: translateY(5px);
+  transition: transform .18s ease, background .18s, color .18s, box-shadow .18s;
+  user-select: none;
+  min-width: 130px;
+  text-align: center;
+  overflow: hidden;
+  letter-spacing: .2px;
+}
+/* のり部分（上部カラーストライプ） */
+.tab-btn::after {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 5px;
+  background: #9CA3AF;
+  border-radius: 6px 6px 0 0;
+  transition: background .18s;
+}
+/* アクティブ時に下ボーダーを白で塗りつぶしコンテンツと繋げる */
+.tab-btn.active::before {
+  content: '';
+  position: absolute;
+  bottom: -3px; left: 0; right: 0;
+  height: 4px;
+  background: var(--white);
+  z-index: 3;
+}
+.tab-btn:hover:not(.active) {
+  background: #B8BECE;
+  color: var(--body);
+  transform: translateY(2px);
+}
+.tab-btn.active {
+  background: var(--white);
+  color: var(--navy);
+  font-weight: 700;
+  border-color: var(--navy);
+  transform: translateY(0);
+  z-index: 2;
+  box-shadow: -2px -6px 14px rgba(28,45,107,.12);
+}
+.tab-btn.active::after {
+  background: var(--navy);
+  height: 6px;
+}
+
+/* ── PL page ───────────────────────────────────────── */
+.pl-upload-zone { border:2px dashed var(--border); border-radius:6px; padding:20px 16px; text-align:center; cursor:pointer; transition:border-color .2s,background .2s; }
+.pl-upload-zone:hover,.pl-upload-zone.dragging { border-color:var(--orange); background:var(--orange-pale); }
+.pl-upload-zone .uz-icon { font-size:30px; margin-bottom:6px; }
+.pl-upload-zone .uz-text { font-size:11px; color:var(--muted); line-height:1.7; }
+.pl-status-ok   { font-size:11px; color:var(--green); font-weight:600; }
+.pl-status-none { font-size:11px; color:var(--muted); }
+.btn-sm { display:inline-block; font-size:10px; background:var(--navy); color:#fff; border:none; border-radius:4px; padding:4px 12px; cursor:pointer; font-family:inherit; transition:background .2s; }
+.btn-sm:hover { background:var(--navy-light); }
+.btn-sm-orange { background:var(--orange); color:var(--navy); font-weight:700; }
+.btn-sm-orange:hover { background:#F5BC40; }
+
+/* PL 予実表 */
+.pl-tbl { border-collapse:collapse; width:100%; font-size:11px; }
+.pl-tbl th { background:var(--navy); color:#fff; padding:5px 8px; text-align:center; font-weight:600; border:1px solid var(--navy2); white-space:nowrap; }
+.pl-tbl th.sub { background:var(--navy2); font-size:9px; }
+.pl-tbl td { padding:4px 8px; border:1px solid var(--border); }
+.pl-tbl .pl-name { font-weight:600; color:var(--navy); background:var(--navy-pale); text-align:left; white-space:nowrap; }
+.pl-tbl .pl-name.l1 { padding-left:20px; font-weight:400; color:var(--body); background:var(--white); font-size:10px; }
+.pl-tbl .pl-name.bold { background:#D8E4F0; font-weight:700; }
+.pl-tbl .num { text-align:right; font-variant-numeric:tabular-nums; white-space:nowrap; }
+.pl-tbl .pos { color:var(--green); font-weight:700; }
+.pl-tbl .neg { color:var(--red);   font-weight:700; }
+.pl-tbl tr.sep-row td { border-top:2px solid var(--navy); }
+.pl-tbl tr.bold-row td { background:#EEF2FA; font-weight:700; }
+
+/* 予算手入力テーブル */
+.bi-tbl { border-collapse:collapse; font-size:10px; width:100%; }
+.bi-tbl th { background:var(--navy); color:#fff; padding:4px 6px; text-align:center; border:1px solid var(--navy2); white-space:nowrap; font-size:9px; }
+.bi-tbl td { border:1px solid var(--border); padding:2px 4px; }
+.bi-tbl .bi-name { background:var(--navy-pale); font-weight:600; color:var(--navy); text-align:left; padding:3px 8px; white-space:nowrap; }
+.bi-tbl .bi-name.l1 { padding-left:18px; font-weight:400; color:var(--body); background:#fff; }
+.bi-tbl .bi-name.bold { background:#D8E4F0; font-weight:700; }
+.bi-tbl .bi-calc { background:#F0F3FA; text-align:right; color:var(--navy); font-weight:700; padding:3px 6px; font-size:10px; }
+.budget-inp { width:66px; background:#fff; border:1px solid var(--border); border-radius:3px; padding:2px 4px; text-align:right; font-size:10px; font-family:inherit; color:var(--navy); }
+.budget-inp:focus { outline:none; border-color:var(--orange); }
+
+/* ── Gantt nav buttons ─────────────────────────────── */
+.btn-gantt-nav { background:rgba(255,255,255,.15); color:#fff; border:1px solid rgba(255,255,255,.3); border-radius:4px; padding:3px 10px; font-size:10px; font-family:inherit; cursor:pointer; transition:background .2s,color .2s; white-space:nowrap; }
+.btn-gantt-nav:hover:not(:disabled) { background:rgba(255,255,255,.28); }
+.btn-gantt-nav.active { background:var(--orange); color:var(--navy); border-color:var(--orange); font-weight:700; }
+.btn-gantt-nav:disabled { opacity:.35; cursor:default; }
+
+/* ── Empty state ───────────────────────────────────── */
+.empty-msg { color:var(--muted); text-align:center; padding:30px; font-size:12px; }
+
+/* ── PL Detail Tab ───────────────────────────────────────── */
+.pl-period-btn { font-size:10px; padding:4px 10px; border-radius:4px; border:1px solid var(--navy); background:var(--white); color:var(--navy); cursor:pointer; font-family:inherit; font-weight:600; transition:all .15s; }
+.pl-period-btn:hover { background:var(--navy-pale); }
+.pl-period-btn.active { background:var(--orange); color:var(--navy); border-color:var(--orange); }
+.pl-month-btn { font-size:10px; padding:4px 9px; border-radius:4px; border:1px solid var(--border); background:var(--white); color:var(--muted); cursor:pointer; font-family:inherit; transition:all .15s; }
+.pl-month-btn:hover { border-color:var(--navy); color:var(--navy); }
+.pl-month-btn.active { background:var(--navy); color:#fff; border-color:var(--navy); }
+.pl1-tbl { width:100%; border-collapse:collapse; font-size:11px; }
+.pl1-tbl th { background:var(--navy); color:#fff; padding:6px 10px; text-align:right; font-weight:600; font-size:10px; }
+.pl1-tbl th:first-child { text-align:left; }
+.pl1-tbl td { padding:5px 10px; border-bottom:1px solid #EFF1F7; }
+.pl1-tbl tr.header-row td { background:var(--navy-pale); font-weight:700; color:var(--navy); font-size:10px; padding:3px 10px; }
+.pl1-tbl tr.summary-row td { background:var(--orange-pale); font-weight:700; border-top:2px solid var(--orange); }
+.pl1-tbl tr.sub-row td:first-child { padding-left:22px; color:var(--body); }
+.pl1-tbl tr.other-sub-row td:first-child { padding-left:36px; color:var(--muted); font-size:10px; }
+.pl1-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; }
+.pl1-tbl td.pos { color:var(--green); }
+.pl1-tbl td.neg { color:var(--red); }
+.pl1-tbl th:nth-child(4),.pl1-tbl th:nth-child(5) { background:#243580; border-left:2px solid rgba(255,255,255,.3); }
+.pl1-tbl th:nth-child(6),.pl1-tbl th:nth-child(7) { background:#2d4090; border-left:2px solid rgba(255,255,255,.3); }
+.pl1-tbl td:nth-child(4),.pl1-tbl td:nth-child(5) { border-left:2px solid var(--border); }
+.pl1-tbl td:nth-child(6),.pl1-tbl td:nth-child(7) { border-left:2px solid var(--border); }
+.pl1-drillbtn { cursor:pointer; font-size:9px; background:var(--navy-pale); border:none; border-radius:3px; padding:1px 5px; color:var(--navy); font-family:inherit; }
+.pl1-drillbtn:hover { background:var(--navy); color:#fff; }
+/* ③ monthly table */
+.pl3-tbl { border-collapse:collapse; font-size:10px; min-width:100%; }
+.pl3-tbl th { background:var(--navy); color:#fff; padding:5px 8px; text-align:right; white-space:nowrap; font-size:9px; border:1px solid var(--navy2); }
+.pl3-tbl th:first-child { text-align:left; min-width:130px; position:sticky; left:0; z-index:2; }
+.pl3-tbl td { padding:4px 8px; border:1px solid #EFF1F7; text-align:right; white-space:nowrap; }
+.pl3-tbl td:first-child { text-align:left; position:sticky; left:0; background:var(--white); z-index:1; border-right:2px solid var(--border); }
+.pl3-tbl tr.pl3-header td:first-child { background:var(--navy-pale); font-weight:700; color:var(--navy); font-size:10px; }
+.pl3-tbl tr.pl3-summary td { background:var(--orange-pale); font-weight:700; }
+.pl3-tbl tr.pl3-summary td:first-child { background:var(--orange-pale); }
+.pl3-tbl tr.pl3-sub td:first-child { padding-left:18px; color:var(--body); }
+.pl3-tbl tr.pl3-other-head td:first-child { padding-left:18px; color:var(--navy); cursor:pointer; }
+.pl3-tbl tr.pl3-other-detail td:first-child { padding-left:30px; color:var(--muted); font-size:9px; }
+.pl3-tbl tr.pl3-cash td { background:#E8F5EE; font-weight:700; }
+.pl3-tbl tr.pl3-cash td:first-child { background:#E8F5EE; color:var(--green); }
+.pl3-tbl .cell-clickable { cursor:pointer; }
+.pl3-tbl .cell-clickable:hover { background:#DBEAFE !important; }
+.pl3-tbl .has-data { color:var(--navy); }
+.pl3-tbl .no-data { color:var(--muted); }
+/* ④ drill */
+#pl4-tbl th { background:var(--navy); color:#fff; padding:6px 10px; text-align:left; font-size:10px; border:1px solid var(--navy2); white-space:nowrap; }
+#pl4-tbl td { padding:5px 10px; border-bottom:1px solid #EFF1F7; font-size:11px; }
+#pl4-tbl tr:hover td { background:#F0F4FF; }
+#pl4-tbl td.num { text-align:right; font-variant-numeric:tabular-nums; }
+
+/* ── Pipeline monthly table ──────────────────────── */
+.pipe-sum-row { display:flex; align-items:center; gap:6px; margin-bottom:6px; }
+.pipe-sum-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.pipe-sum-name { font-size:11px; color:var(--body); flex:1; min-width:0; }
+.pipe-sum-total { font-size:12px; font-weight:700; color:var(--navy); width:90px; text-align:right; }
+.pipe-sum-h { font-size:11px; color:var(--muted); width:50px; text-align:right; }
+.pmtbl th { background:var(--navy); color:#fff; padding:4px 6px; text-align:right; font-size:9px; border:1px solid var(--navy2); white-space:nowrap; }
+.pmtbl th:first-child { text-align:left; min-width:100px; }
+.pmtbl th.pmtbl-h { background:#2A3E7A; }
+.pmtbl td { padding:3px 6px; border:1px solid #EFF1F7; font-size:10px; text-align:right; }
+.pmtbl td:first-child { text-align:left; font-weight:600; color:var(--navy); }
+.pmtbl input.pm-inp { width:58px; border:1px solid var(--border); border-radius:3px; padding:2px 4px; text-align:right; font-size:10px; font-family:inherit; background:#F9FAFD; }
+.pmtbl input.pm-inp:focus { outline:none; border-color:var(--orange); background:#fff; }
+.pmtbl tr.pmtbl-total td { background:var(--navy-pale); font-weight:700; }
+.pmtbl tr.pmtbl-total td:first-child { color:var(--navy); }
+</style>
+</head>
+<body>
+
+<!-- ══ Login Screen ════════════════════════════════════════════ -->
+<div id="loginScreen" style="
+  position:fixed;inset:0;z-index:9999;
+  background:linear-gradient(135deg,#1A3988 0%,#4A7BFF 100%);
+  display:flex;align-items:center;justify-content:center;
+  font-family:-apple-system,BlinkMacSystemFont,'Helvetica Neue',sans-serif;">
+  <div style="
+    background:#fff;border-radius:16px;padding:48px 40px 40px;
+    width:100%;max-width:380px;box-shadow:0 24px 64px rgba(0,0,0,.45);">
+    <!-- ロゴ -->
+    <div style="text-align:center;margin-bottom:32px;">
+      <img src="data:image/png;base64,/9j/4AAQSkZJRgABAQAAAQABAAD/4gHYSUNDX1BST0ZJTEUAAQEAAAHIAAAAAAQwAABtbnRyUkdCIFhZWiAH4AABAAEAAAAAAABhY3NwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAQAA9tYAAQAAAADTLQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAlkZXNjAAAA8AAAACRyWFlaAAABFAAAABRnWFlaAAABKAAAABRiWFlaAAABPAAAABR3dHB0AAABUAAAABRyVFJDAAABZAAAAChnVFJDAAABZAAAAChiVFJDAAABZAAAAChjcHJ0AAABjAAAADxtbHVjAAAAAAAAAAEAAAAMZW5VUwAAAAgAAAAcAHMAUgBHAEJYWVogAAAAAAAAb6IAADj1AAADkFhZWiAAAAAAAABimQAAt4UAABjaWFlaIAAAAAAAACSgAAAPhAAAts9YWVogAAAAAAAA9tYAAQAAAADTLXBhcmEAAAAAAAQAAAACZmYAAPKnAAANWQAAE9AAAApbAAAAAAAAAABtbHVjAAAAAAAAAAEAAAAMZW5VUwAAACAAAAAcAEcAbwBvAGcAbABlACAASQBuAGMALgAgADIAMAAxADb/2wBDAAUDBAQEAwUEBAQFBQUGBwwIBwcHBw8LCwkMEQ8SEhEPERETFhwXExQaFRERGCEYGh0dHx8fExciJCIeJBweHx7/2wBDAQUFBQcGBw4ICA4eFBEUHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh4eHh7/wAARCAIAAgADASIAAhEBAxEB/8QAHQABAAEFAQEBAAAAAAAAAAAAAAgBBQYHCQQCA//EAFUQAAEDAgMFBAQHCwgIBQUAAAEAAgMEBQYHERIhMUFRCBNhcRQiMoEjUmJ1kaGzFRY2N0JDcoKSscEkM1NWc6Ky0RdVY5OUlcLSGCU04fBERWR08f/EABsBAQACAwEBAAAAAAAAAAAAAAAEBQIDBgEH/8QANxEAAgIBAgMFBgUEAwADAAAAAAECAwQFERIhMRMiMkFRM2FxobHRBjSBkfAUI0JSFSThFlPB/9oADAMBAAIRAxEAPwCZaIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiEgcSEARAQd4Oq+XyRxjV72t8zogPpF5JrpbISBLcaOPXhtTtGv1rxuxPhpri12IbQCNxBrY931rJQk/I84kXdFaBijDJ4YitH/ABsf+a9cN1tcxIhuVHIQNSGztP8AFHCS6obo9iL4jlik9iRj/wBFwK+yQOKxPQiajqE1CAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCpqqOOh8FgOOM4MA4RL4rjfoZ6tnGko/h5dehDdzT5kLOuudj2gt2YykormzP9VTb4+HFRTxj2prpP3kGE8PQUkZ3Nqa9/eSeew31R7yfJadxXmVjvFBcLzie4SxO4wRSdzF+wzQaeeqtadEyLOc+79SLPNrj05k5sUZi4HwztNveKLZSSN4w98Hyj9RurvqWs8Q9p/A1DtMtVBdrs8EjVsQhYfe866e5Q4AAOoABRWlWg0R8bb+RFlnTfhRIe99qrEcxc2zYXtdG3k6qmfO76G7I/esJu2f2aVw2mi/xUTD+TS0kbCP1tCfrWrkU+GnYsOkF9TQ8ix9WZRcsw8d3IEV2Mb7MDy9Mc3/DorFU3O51JJqblXT68e9qXv1+kleRFJjVXHpFfsanJvqymywnUsaT5BNlvxR9Cqiz2R4U2W/FH0IWM+I36FVE2QPVT3G4UxHo1wrINOHdVD2fuKvltx/jm26eg4vvsOm7/ANa93+IlYyixlVCXVIyU5LozZ1pz7zSt2y374xWMb+TVUschPmdAfrWbWTtU4ogDW3jDdprmjcXQSPgcfHftD9yj2iiz07Fn1gvp9DYsi1dGTDw/2osE1hDLta7vanHQbWw2dn0tOunuWzMMZl4ExKWts2KbZUSu3CJ03dyH9R+hP0LnghAPEa+ag26FRLwNo3xzrF1W507DwQCDqDwKqCuduFMxccYWe37iYmuNPE38w+TvYv2H6jRbiwb2przTFkGK8P01fFwdUULu6k8yx2rXHyLVV36JkV84d5EqGdXLryJY6ote4HziwBi4shoL9DS1jjoKSt+Al16Da3O9xK2CCDwVTZXOt7TWzJUZRkt0yqIiwMgiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIhICAKhXzNNFDE+aWRscbGlz3uOgaBxJJ4BaKzS7R+HLA+W34TiZf7g0lpm2i2kjP6Q3yeTd3it1GPbfLhrW5rssjWt5M3fX1lJQUklXW1UFLTxDaklmkDGMHUuO4LSGYfaVwpZTJSYXp5MQVjdwlBMVK0/pHe/wDVHvUYMd48xXjer9IxFd5qlgOsdM31II/0Yxu951PisZXRYuhRjzue/uRX250nygjPce5vY9xk58VxvclLRP1/kdDrDFp0Oh2nfrErAmgAbhoPBEV5XVCpbQWyIUpOb3kwiIthiEREAREQBERAEREARFVAUREQBERAEREAVVREAIB4gHzWeYCzdx5g0xx229S1NE3T+R1pM0WnQanab+qQsDRa7KoWraa3RlGcovdMmLl52lcK3oxUmJ6eTD9Y7Qd6XGSmcf0wNW/rDTxW8KKrpq2kjqqOphqaeVu1HLE8PY4dQRuK5lLKcBZgYtwPVd9h67zQRE6yUr/Xgk82Hdr4jQqjytCjLvUvZ+hNqzmuUzomqhaKys7RmG8Ruht2J2Mw/cnENEjn60sp8Hnezydu8VvGKWOVjZI3B7HgFrmnUEHgQei5y7Hsolw2LYsYWRmt4s/RE1RajMIiIAiIgCIiAIhOi8l0uNDa7fPcLjVw0lJAwvlmmeGsY0cySi58kD1osKwBjCXG9RU3W00rocNwudDTVUzC2SvkG5z2NPsxN4ane49AN+ahZSg4PZ9TxSTW6CIixPQiIgCIiAIiIAiIgCIiAIiIAiIgCIvxqaiKmgknqJWQwxtL3ySODWtaOJJO4DzQH6uOgJ4rAM1c18K5e0pbcqn0q5ubtRW6nIMzuhdyY3xPuBWoc6u0dsumseXzw4jVkt3c3UdCIWnj+mfcDxUZqypqKyqlq6yolqKiZxdLLK8ue9x4kk7yVe4OjTt2ndyXp5kC/MUe7DqZ1mnm5i3MCd8NdVeg2rX1LdTOIi05bZ4yHz3dAFr9EXT1VQpjwwWyK2U5Te8mERFsMQiIgCIh05nRAEWWYSy4xxirZdZMNV88LuE8jO6h89t+g+jVbawv2WcQ1QbLiLENBbWHeYqWMzyeRJ2Wg+I1US7Ox6fHJG2FFk+iI8qmoB0JAU1MPdmvLq3Brrg253iQcTU1Ow0/qxhoWwbDl1gWxtaLZhOz05b7L/RWveP1nan61W2a9THwRbJMcCb6s572+1XW5HS3WuvrCToBT0z5f8IKyO35X5i17Q6lwVfHg83U3d/4yF0MjjjiYGRsaxo3ANGgCqQDxUSf4gsfhgkbVp8fNkC6bIvNWdu0MJzR8DpLURNP+Je4dnnNY/8A2Gk/5hF/mpzaDoEAA5LS9dyPRfz9TP8AoK/VkGj2ec1v9Q0n/MIv814anIvNSBupwpLJx/mqiJx/xKemgVNB0CLXcn0X8/Uf0FfqznnX5XZjULS6qwVe2Ac20/ef4CVjdxtN2tp0uNrr6M//AJFM+L/EAumGgVJI2SMLJGNe07iHDUFbo6/YvFBGDwF5SOYeo10BBPTVfR4ronfMu8DXprm3PCdnnLvaf6I1rj+s0A/Wtf4i7NeXNx2nW+O42eQ8DS1Jcwfqv1Cl169TLxxaNUsGa6PchWikNijss4hpWulw5iKhuLRqRDVRmB/kCNppPnotS4ty3xzhXade8NV8ELeNRGzvofPbZqAPPRWVOfj3eCSI06LIdUYmiAg8CilmoIiIAiIgHLRbGypzixbgCWOnp6g3Kzg+vb6l5LGjn3buLD5bvBa5Ra7aYXR4ZrdGUJyg94s6B5WZoYWzCoe8tFV3Ncxus9BOQ2eLqdPym/KbqPJZy06hc0bA+7R3ujfYXVjbp3oFKaTXvtvlsbO/VdAMpHY3dgylOPW0bbueIg9rY5d5p6veddnd71yGp6fDFacJcn5eZbY2Q7Vs0ZeiDgiqiWERU13oCqo7gVQnQ8VoTOztC27DpnseDXQXS7N1ZLVn1qelPu/nHDoNw5nkt1GPZkS4ILcwssjWt5Gyc0sycM5e2v0m9VW3VSNJpqGIgzTnwHJvVx3KNVrr8Y9onMGK33CZ9DhqjeJ6impyRFBFruBP5cruAJ4byAAFqVpxFjjF0bHy1V3vdznEbXSP2nyOPDU8A0DyAAKnfk9gK35e4OgstLsy1Tvha2pA0M8xG8/ojgB0Hmrq6mrTavWx/L4EKE5ZMvSK+ZlFpt9Ha7dT26307KakpomxQxMGjWNaNAAvYmiLn+b5ssAiIgCIiAIiIAiIgCIiAIiIAiIgCKjuCxHNLMCwZf4fddLzNtSv1bS0kZHe1D+jRyA5uO4LKEJTkoxW7Z5JqK3ZdMZ4msuEbHPe79XspKOEcTvc93JrW8XOPIBQvzszmvuYVTJQU3eWzDzXfB0bXetNpwdKR7R57PAeJ3rGMzcfYgzAvxud6n2YmailpI3ERUzSeDRzPVx3lYoF1unaTGhKyznL6FTkZbs7sehVURFckMIiIAiK5YasF6xLdGWuw2ypuFW/81AzXQdXHg0eJIC8lJRW75IJbvZFtVxw9Y7ziG4NoLFa6u41J/N08ZeR4k8GjxOikhlp2YYmiKvx3ce+dud9zqJ+jR4Pl4nxDdB4lSHw5h+y4dtrbdY7XSW6lb+bp4w0E9TzcfE6lUmVrddfdq7z+RNqwpy5z5EXMB9l++14jqsX3aK0wneaWkAmn8i4+o3+8t8YIyfy/wAJFktuw/BPVs3iqrPh5deoLtzfcAtgDgioMjUMi996X7E+vHrr6I+Wt0GmgACqqooRvKc1VEQBERAEREAREQBERAFTRVRAU9yoQN+o16r6RAa/xvk/gDFu3LcbBBBVv3mqovgJdepLdzj5grQ+Pey/freH1WELrFd4RqfRqoCGceAcPUd/dUuFQqbj6jkUeGXL0fM0WY9dnVHNTEFjvGHrg633y2Vduqm/mqiMsJ8RyI8QSFbl0nxLh6yYltr7dfrXS3GkfxjnjDtD1B4tPiNCo8ZndmKNzZa/ANfsO3u+5tbJ6p8I5eI8nfSFf4ut1WPhtXC/kQLMKUeceZF9FccRWO8YduklsvlsqbfVs4xTsLSR1B4OHiNVbtRz3K7UlJbp8iE+T2YWVZb4AxJj68i3WGk1jYR6RVyaiGnHVzuvyRqSth5J5B3fFpgvWJxPabGdHsj02aiqHyQfYafjHf0HNS8w1YbThy0QWmyW+ChooBoyKJug8yeJJ6neVS5+rwp7lXOXyRMow3PnPoYblBlJhvLujElLH6deHt0nuMzRtnq1g/Ib4DeeZK2KB4KqLlbLZ2ycpvdstYxUVsgiL51HVYGR9K04pxBZ8MWaa8Xy4Q0NFCPWkkdpqegHFxPIDeVhmceb+HMu6V1PM8XC9vZrDb4n+sNeDpD+Q36zyChlmLjvEmPLybliCtMgaT6PTR+rDTtPJjf3k6k8yrTB0uzJ70uUfX7EW/KjXyXNmw87M+rzjHvrNh3v7RYTq1512aiqHyyPZb8ke88lpUbhpwA+pFursuZXHGOIRiO80+1YrZKC1j2+rVTjeGeLW7i73Dqunao0+htLZL5lYuO+fM2t2UMrfvctDcY3ynLbvcIv5JE9u+lp3cyOT38T0Gg6rfjeCo0abgvpcVkZE8ix2T6suq61XFRQREWkzCIiAIiIAiIgCIiAIiIAiIgCpr4KqxDNXHtny9wvLeLo/bldqykpWn16iXTc0eHMnkFlCEpyUYrds8lJRW7PLnBmTZsusOmur9KiunBbRUTXaPncOZ+K0c3fxUGMdYsvWNMRz3y+1JmqJdzWDUMhZyYwcmj6+J1KY7xZesaYjnvl9qTNUy7mMbuZCwcI2Dk0fWd5ViXZ6dp0cWPFLnJlNkZDtey6AIiKzIwREQBVAc5wa1pc4nQADUk9FecF4Vv2Mb5HZ8P0ElXVP3uI3Mib8Z7uDW+P0aqYuTOR+H8CNhuVxEd4v4GpqXs+DgPSJp4fpHf5cFAzdRqxVz5v0N9OPK3pyRpfKDs63vEXc3XF75rLa3aObTAaVUw8j/Ng9Tv8ApVYPwnh/CNpZa8PWynoKYe0I2+tIer3He4+JKvQHDcvpcllZ12U95vl6eRbVUQqXIoAqoihm4IiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAJpvREBTRCNRoqogLDjPCGHsYWl9sxDa4K6A+wXjR8Z+Mxw3tPktc5fdnnB2FsRS3iolnvTmSbVDFWNaWU46kDc9wPAnh013rciLfDJtrg4Rk0mYOuEnu0fOx03L6RFoMwiErG8fY0w9gizOuuIa9lNFvEUY9aWd3xWM4uP1DnosoxcntFbs8bSW7MgqJ4oIHzTvZFFG0ue97gGtaBqSSdwAUZ87O0WyLv7Fl7IJJN7JrsW6tb17kHiflnd0B4rVucuc+IswZn0MZfa7CHasoY375d+4yuHtH5I9UePFawHBdNgaKo7Tv6+n3Ky/Mb7tf7n61dRUVdVLVVc8tRUTPL5JZXlz3uPEkneSvyRftR01RWVcNJSQST1E8jY4ooxq57ydA0DmSVf8or02IHNsyLK/Bdyx5jCksFuBYHnbqajTVtPCD6zz48gOZIXQDClhtuGcP0VjtEAgoqOIRxtHE9SepJ1JPUrC8gst6fLvB7IJ2xyXqtDZbhMN/rco2n4rddPE6nmtkri9Uznk2cMfCv5uXOLR2Ud31YREVYSgiIgCIiAIiIAiIgCIiAIiIAqFV1X5Vc8NLTyVNRKyGGJhfJI86Na0DUknkAEBaMa4mtOEcOVd/vVT3FJTM1Pxnu/JY0c3E7gFAnNPHN3zAxXPe7o4sj3spKYO1ZTRa7mjx5k8z7lk3aGzQnzCxP6PQyPZh+3vLaKLh3zuBmcOp5DkPElauC6/SdOVEe0mu8/kVGVkOx8MegREVyQwiIgC2Bk5lXfsx7qW0oNFaIHaVVwkZq1vyGD8p/hwHPobxkJk5ccwq9tzuTZqPDULyJZx6r6lw4xx/xdwHAb+E1rDaLbY7VT2q00UNFRUzNiKGJuy1o/wA+ZPMqk1LVlRvXVzl6+hNxsXj70uhasv8ABeH8D2JlosFE2CPc6WV2+Wd3xnu5n6hyWSKiquTlOU3xSfMtUklsgiIvD0IiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIipqEBVUPBeW7XKgtNunuNzrIaSkgaXyzTPDWMHUkqKOdvaHrbx39jwJLLQ286sluJGzPOOkY4saevtHwUrFw7cqW0Fy82abbo1LeRtXOvPOx4HbNabQYrviADZMLXaw0x6yuHP5A39dFD7F+Jr7iy9y3jEFxmrquTcHPOjY26+yxvBrfAK0EkuLnEkk6knifFUXX4Wn1Yq5c36lTdkStfPoVVERTzQFKPsi5XGGOPMK+0+kkgItMMjd7WncZyOp4N8NTzC1Z2dss5cwcXCWuicLBbnNfXO4CU8Wwg/K59G+YU6KaGOngZBDGyOONoaxjBo1oG4ADkNFz2s5/Cuwg+b6/YsMOjfvyP0aNyqiLmCzCIiAIiIAiIgCIiAIiIAiIgCIh4ICjjoFGDteZonV+XtiqCODrvKw+9sGv0F3uHVbez3zChy9wRPcGFj7pVawW6E/lSke2R8Vo3n3DmoE1lRUVlZNV1cz56iZ7pJZXnVz3E6lx8STqr3RsHtJdtNcl097/8IGZfwrgifkiIurKsIiqgKLbPZ7yiq8wrqLnc2SQYapZNJpQdl1S8fmmH/E7lw48LPkflpX5j4nFNq+ns9IQ+4VQHBp4RsPx3fUNT4GdthtNvslopbTaqWOloqSMRQxRjQNaP3nx5qk1bUuwXZV+L6f8ApNxcbj70uh+tsoKO2UEFBb6eKmpaeMRwwxt2WsaOAAXqCaIuSLYIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAipqjnbI1JAAQBx0WFZp5l4Zy9tfpN4qu8rJWk01DCQZpj4D8lvyju8zuWts7u0LbsPmex4LdBcrs3VktZ7VPTHgdP6Rw/ZHPXgonXq63K93Se6Xatnra2d21LPM/ac7/28BuCusDR53d+3lH6kK/LUOUeplma+Z+JcxLjt3Sf0e3Ru1prfC491H0J+O75R92iwZEXVVVQqiowWyRVyk5veQREWwxCvOCsN3TF2J6LD9nh7yrq37IJHqxtHtPd0a0bz/7qztaXODWtc5xOgAGpJ6KbXZmyvbgbDP3Wu0AGIbnGDPqN9NFxbEPHgXeO7koGoZscSri830N+PS7ZbeRn+XOErXgjCdHh60s+Bp26ySketNIfae7xJ+gaDksjVGgBVXDyk5Nyl1ZdpJLZBUcdBqqla4z6zJp8u8HPqYjHJeKzWG3QHf6+m+Rw+K3iep0HNZVVytmoRXNnkpKK3Zdm5jYYdmU7ADazW7tp++PxNvj3Wvx9n1tOniswB1XNGK7XSK+NvrK6YXRtR6UKra9fvtra29euqnrkpj+lzCwTT3dmxHXxfA3CnH5qYDfp8l3tDwPgrPUNMeLGMovdefxI2Pk9q2mZ0iDgiqSWEREAREQBERAEREAX51M0VPBJPNIyOKNpc97zo1oA1JJ5ABfZK0J2wce/cLCkWEbfMW3C8NJqC06GOlB0d73kbPkHLdj0SvtVcfMwsmoRcmR8z3x7NmBjyouMb3fculJp7dGeUQO9+nV53+Wg5LAU5Iu+qqjVBQj0RQyk5ScmERFsMQr5gXC90xliijw9aItqpqX73kerEwe1I75IG/6uasjGue4NawucSAABqSeQHVTh7NmWTcB4TFdcoWi/3NjX1ZPGBnFsI8uJ+V5BQNRzViVbrxPob8el2y9xnGXWELTgjClLh+0R6QwjWSVw9eeQ+1I7xP1DQclkSN4Kq4eUnJ8T6l2kktkERF4ehERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREKAJqqajitaZxZw4by8p3Uz3i43t7NYrfE7Qt14Okd+Q36zyCzqqnbLhgt2YzmoLeRmuKsRWbC9nmu1+uMNDRRD1pJDxPJrRxc49BqVEHOvPm9YzM1nw+ZrRYCS12jtKiqHyyD6rT8Qe8ngteZh45xHjy8m54hrTKWk9xTx+rDTjoxvLzO88ysaXV4GkQo2nbzl8kVV+W7OUeSHLTgFVURXRDCIiAIizrJPL2szExlFbW95FbafSW41Lfzcevsg/GdwHvPJa7bY1Qc59Eexi5vhRszsk5Xfda4R48vlPrQUkn/AJbE9u6eYHfL+iw7h1dv/JUthwXktNvo7Xbae3W+nZT0lNG2KGJg0axoGgAXsXC5mVLKtc5foXtNSqjsgiL5JAUQ2ltxRe7bhyw1t7u9SKeio4jJK89ByA5kncBzJUAM1MbXHH2MKq/1+0yN3wdJT66inhBOyzz5k8ySti9qjNH77b+cL2Wo2rHbZT3sjTuqqgbifFrd4Hjqei0gF1+j4HYw7Wa7z+SKjMv43wLogti9n7MCTAGPIaqokcLRXFtPcGcgwn1ZNOrDv8i5a6Qq2uqjdB1y6Miwm4S4kdOoZGSxNkje17HtDmuadQQeBC+1onsh4+++LB78LXCfauVlaBEXO9aWmO5h8dk+qf1eq3suByKJUWOuXkX1c1OKkgiItJmEREAREQBERAea51lNbqCor6yVsNNTROlmkPBrGjUn6Aud+ZmK6rG2NrliOqLgKmUinjP5qEbmM9w4+JKk72y8Zmz4Mp8KUkulXeXEz7J3tpmHU/tO0HkHdFD5dRoWLwwd0ur5L4FXnW7y4EERF0BACIrphKw3DE+JbfYLWzbq66YRM6N6uPg0ak+S8lJRTk+iCTb2RubsiZc/fBiI4yutPrbLVJpSNcN01SOenRnH9IjoVMIN0VlwRh23YTwvb8P2uPYpaKERtJ4vPFzz4uOpPmr2uDzsp5Nrm+nkXtFSqhsERFENwREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAX5VNRBTwST1ErIYo2lz3vcGta0cSSeA8Vj+YGNsO4HsrrpiCvbTxnURRN9aWd3xWN4k/UOZChpnJnJiLMKd9E0utlhDvg6CN++QcjK4e2fDgPHip+Fp9uU91yj6ke7IjUvebTzs7RrW9/YsvZQ529k13LdQOohB4n5Z3dAeKjJV1E9XVS1VVPJPUSuL5JZHFz3uPEkneSvyRdfi4dWLHhgviyottla95BERSjWEREARE103ndogPbYbVcL5eaS0WumfU1tXKIoYm/lOP7hzJ5AFT8yewDQZfYNp7NS7MtU74SuqQNDPMRvP6I4NHIDxK1t2T8rDhy0NxjfKbYvFwi0pInt9alpzz38Hv3E9BoOZW/GjQaLktYz+2n2UH3V82W2HRwR4n1ZXTciIqQmgrTfavxlecKZetp7PBMx91lNJLXM4UzC3UgdHuGoB8+ei3IVYMfYat+L8JXDDtzaDBWRFofpvjeN7XjxadD7luxpwhdGU1ukzXYnKLSOcI3DRFccS2Wvw7iCusV0j7usoZ3QyjkSDucPAjQjwKty+gxkpLddCga25MIiL0GT5W4uqcD45t2IqfadHBJs1MY/Owu3Pb56akeIC6HUFXT11FBWUkrZqeojbLFI07nNcNQR5grmUpidjjGZvWCJ8L1c21WWVw7nadvdTP3t/Zdq3y2Vz+u4vFBXRXNcn8Cfg27PgZvlFQKq5ctAiIgCIiAL5edATrppzK+itddojFZwllTdq2CTYrKpnoVKQdCJJPV1Hk3aPuCzqrdk1BeZjOSjFtkQM9cXOxpmddbtHKX0cT/RaLfuEMZIBH6R2ne9YMgGgARfQaq1VBQj0RQTk5Scn5hERbDEKUvYuwOIaOsx5Xw/CT60lu2m8GA/CSDzPqg9AeqjbhSx1mJcS26w0DdamvqGwMPxdTvcfADU+5dGMM2ejsGH6CyW6MR0lFAyCIAaaho01PieJ8SVRa5lcFaqi+cuvwJ2FVxT435FxAAVUCLk0WoREXoCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAKhVV47xcqC0W2e5XOtho6OnbtyzTPDWNHiSiTb2Q6HqJ8VpzOvPay4IE1osvdXe/jVpja7WGlPWRw4n5A39dFqnOztD1977+xYGkmt9tOrJbgRsz1A+QOMbT19o+Cj7qSSSSSTqSTrqeZXQYGjOW07/2+5X35qXKv9y7YuxJfMV3uW8X+4S11ZIfaedAxvxWN4Nb4BWkIi6aMYwW0Vsitbbe7CIiyPAiIgCIiALdXZbyv+/DEQxJeacmxWyUFrHj1aqcbwzxa3cXeOg6rXuV+C7lj3GFLh+2gsD/hKmo01bTwg+s8+PIDmSF0AwrYbbhrD9FY7RTiCio4hHE0cfEk8yTqSeZJVJq+f2MOyg+8/kibiUccuKXRF0aABoBuVQiLki2CIiAJoERARi7aOBQ6Okx7QQ+szZpLiGji383IfI+qf1eii+ulGLLHQ4kw5cLFcow+kroHQydQCNzh4g6EeIXOfElorMP4guFjuDdmqoah8EviWnTUeBGh966zQ8rtKnU+sfoVObVwy4l5lvREV4Qgs7yFxa7BmaFquckpZRTv9Erd+g7qQgan9F2y73LBEI1Gh4HctdtatrcJdGZQk4yUkdO2nXfrqvpa87POKzi7Kq0V879usp4/Q6vU6nvI/V1PmNk+8rYa+fW1uqbhLqi/jJSSaCIiwMgiIgB4KJnbbxL6ViSz4Ugk1joYTV1AB/OSeqwHxDQT+upZPIDSSdAOJ6LnXmxiB2Kcx77fNsvjqKx4hOuo7pnqM08NloPvVzodHHkcb/xIedPhr4fUxdERdeVAREJ0BPHRASK7FGEhWYgueMaqLWOgZ6JSEjjK8avcPJug/WKlmOCwTIjCwwjlbZbVJHsVT4RU1W7Q99J67gfEahvuWdjguD1DI7fIlLy6Ivcevs60giIoZuCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIhQBfJIBIRzg0EkhR/zt7Q1vsJnseCnwXK6tJZLXH16emPPZ/pHj9kc9eC30Y9mRPggtzCyyNa3kzZeamZuGsvLYJ7vOZq2VpNNQQkGabx0/Jb8o7vNQwzWzOxLmJcu+u0/cUEbtaa3wOIhi6E/Hd8o+4BYpebncbzc57ndqyetrZ3bUs0z9pzj5/wAOAXjXW4Ol14q4nzl9CovyZW8lyQREVoRgiIgCIiAIiIAv2o6aorKuGjpIJJ6iZ4jiijGrnuJ0DQOpJX4qUnZFyu7iGPMG/Uw72RpFpikb7DDuM+nU7w3w1PMKLmZUcWpzf6fE2U1O2fCjaGQWW0GXeD2Qzhkl5rdmW4TDf63KMH4rddPE6lbJCoBuVVwltkrZuc3zZexioJJBERYGQREQBERAUO9RI7auEW0GJ7di+lj0iucfo1UQOE0Y9UnzZu/U8VLjRYB2gMK/fblVebfFGX1UMXpdKANT3sfrADxIBHvU3TsjsMiMvLozRkV8dbRAFEB1APUIu7KMKqoiAkX2IsS+i4jvOFZ5NI62EVlOCfzkfqvA82kH9RSx13rnZlNiB2F8ybDew8sjgrGNm36axPOw/Xw0cT7l0RaQWgg6jiD1XIa5TwZHGv8AJFvhT4q9vQ+0RFTEwIiFAYhnPffvbytxDd2vLJYqF7ISDvEjxsMP0uB9y54gaADpuUwO2xePQ8vLdZ2O0fcbg0uAO/YiaXfRqWqH663QquGhz9X9Cpzpb2begREV2QgswyXw799WaFhsz49uB9UJqgcu6j9d2vgdAPesPUi+w/YfSMS37EcrNW0dMykiJH5ch2naeIa0ftKHn3djjymv5ubaI8diRLBvs8NPBfSoFVcGXwREQBERAEREAREQBERAEREAREQBERAEREARFQkA8UBXVWjFuI7LhayzXi/XCGho4uL5DxPJrRxc48gN6wjOTOLDuXlO+kc5tyvjm6xUET97NeDpT+Q3w4nkOahpmFjfEeOrybniGudM5uoggZ6sNO34rG8vPeTzKtcHSrMnvS5R+vwIt+VGvkubNg51573vGpns9i760WAktc0O0nqh/tCPZb8ke8laaG7hwRF1uPRXjw4K1sVNlkrHvIIiLcYBERAEREAREQBEV4wXhu6YuxPRYfs8XeVdW/ZBPsxtHtPd0a0bz9C8lKME5S6IJNvZGcdnXLOXMHFve10ThYLc5r61/ASu4thB6nn0b5hTogijhhjhijZHHG0NY1o0DQBoAByCsWXWErXgnClHh60s+CgbrJIR600h9qR3iT9A0HJZEuH1DNeVbv5LoXePSqo7eYHBERQCQEREAREQBERAF8yeydRr4L6Q8EBzuzgw6cK5mX2yBhbDFVukpx/spPXZ7tHae5YmpDdt6wClxbZMRRR6Nr6V1NKQOL4jqCfNr9P1VHld7gXdtjwn7ihvhwWNBERSzUHDVpHULodk1fvvlyvw9eHP2pZqJjZj1kZ6jz9LSfeueKmF2KLwazLm4Wh7tXW64O2dTv2JGhw92u0qTXauKhT9H9Sbgy2m16m+0QIuSLYIUQnQEoCIfbfunpGO7JaGu1bRW90rgDwdK87vojH0qPy2V2nriLlnff3NOraZ0VKB02I2g/WSVrVd3p0ODGgvd9SiyJcVsmERFNNJUKa/Y+s33NyegrXM2ZLpVy1RPVoOw36mKE51AJHFdGcrrULJl3h+1bGw6nt0DXjo/YBd/eJVFr1m1MYer+hOwI7zcjJERFyhahERAEREAREQBERAEREAREQBERAEREAVNVU8FYscYotOD8NVd/vc5ipKZu8NGr5HHc1jRzcTuAXsYuTSXU8bSW7LxU1ENNBJUVEscMMTS+SSRwa1jRxJJ3AKMmdnaM/n7Hl7Lqd7JruW7vKEH/GfcOa1bnHnFiPMOpfSFzrZYmu1joIn/wA5pwdK78s+HAdOa1ounwNGUNp39fT7lZkZjfdrP0qZ5qmokqKmaSaaVxfJJI4uc9x5kneT4lfmiLoEtuSIAREQBERAEREAREQBERAVa1znBrWuc5x0AA1JJ4AeKm32ZsrxgbDP3VusAGILpGHT7Q300XFsI6Hm7x3clqnsk5XC73BmPL7T60FLIRbYXt3TzA6GXTm1vLq79FS1A0XL61n8T7CHTz+xZ4dGy45FQNFVEXPlgEREAREQBERAEREAQohQGle2NZvullE+4NZtSWutiqAejHExu+pyhbzXRLNq1C95Z4jthZtumt02w3Ti9rS5v1tC51tJIBPHRdXoNnFTKHo/qVWdHaaZVERXpBCkH2H7p3GOL7Z3O0bWW9szQTxdE/Td46SH6FHxbN7Llw+52d9iLnbLKrvqZ2/jtxnT6wFD1CvjxZr3fQ3Y74bUyeARBvAKLgy9CIvzqn93SyycNhhd9AQHOfMutNyzExHXk6ma6VB166SFv8Fjy/aun9KrZ6onXvpXyftOLv4r8V9FrjwwSOdk922ERFmeFww1Q/dPElqtpaXCrrYYCB0fI1v8V0rjAa3ZA4blz5yKpBW5x4Up3N2m/dJj3DwaHO/6V0HZ7K5bX572Qj7iz09d1sqiIqAsAiIgCIiAIiIAiIgCIiAIiIAiIgCIqHQID5mkZFE6SR7WMaCXOcdAAOJJUHe0jmc/HuKvQbbM44ftr3NpQDoKiTg6Y+B4N8N/NbU7XGaP3PpH4BsVQRV1LAbpMw74ojvEII4OdxPRvmoprptFwOFdvYufl9yszL932cQiIuiK8ISAN5A81sLJfKu85k3d7ad/oNppnAVdc5uoaeOwwflPI36cBz5Ay+wNlHgPCFOwW+wUtRVNA2qysYJpnHrq4aN/VAVZmarTivg6sk04s7Vv0Rz97yP+kZ+0F9ajTXVdMpbdQTRuiloaaSMjQsdC0g+7RawzJyGwRiyCWahoI7DcyCWVNDGGMLvlxj1XDy0PiodWv1ye047L47m6WBJLdPcg4iyDMDB97wPiSaxX2nEc8Y2o5GHWOaM8HsPMfWDuKx9XsJxnFSi90yC04vZ9QiIsjwIiIAs6yTy8rMxcYx2xm3FbafSW41DfzcWvsg/GdpoPeeSxKxWqvvl5pLPaqZ1TW1coihibxc4/uHMnkASp95PYCoMvcHQWWl2Zqp/wtdUgaGeYjef0RwA5AKq1TO/pq+GL7z+RKxaO0lu+iMrtVvorXbaa3UFMynpaaNsUMTBo1jQNAAvUqKq4zffmy5QREQBERAEREAREQBERAEREB8SsbJG6N4Ba4EEEcQVzRvlGbdfLhbjxpaqWD9h5b/BdMD1PJc8866RtDm7iumaNA25yu/a0f/1LoPw/P+5OPu/n1K/PXdTMPREXUFYFkuVld9zcy8M139Ddac/S8N/6ljS9Vqn9GulHUj8zUxSfsvB/gtdseKEo+qPYvZpnTMbhoi+IH95BHJ8ZoP0hfa+dnRBW3Fc3o+F7tUDX4KimfuOh3MJVyVhzFe6PL7Eb2HZc21VRB6HunLOvxI8l0ZzfZuY0eAVUHAeSL6IuhzoREXoNn9lmAT55WIHT4MTyjXwid/mp2t4KDvZIAOeNs15UdWR/u1ONcjrr/wCyvgi2wV/b/UIiKlJoREQBERAEREAREQBERAEREAREQAla9z1zFpcu8HyVzTHJdqrWK3U7vypNN73D4rddT7hzWYYlvVuw9Y6u9XapbTUVHEZZpCeAHIdSeAHMlQBzYxzccwMY1N8rduODXu6KmLtRTwg7m/pHi48z5Kz0zBeVZvLwrr9iLk39lHl1ZjNxrKu419RcK6okqKupkdLNLIdXPeTqSV+CIu1SSWyKYL0W6jqLjcKa30rNuoqZmwxN6vc4NH7151muRTIpM5MJtm02PunGRr1GpH16LXdNwrlL0T+hlCPFJInNl3hWgwbg+3Yet7GhlLEBI8DfLId73nxLtSsiCo32RvVV88lJyk5PqzoEklsgqFVQrw9NSdqTBMOK8tKu4QwtNzsrHVlO8D1ixo1kZ5Fo106tCg6ul98ZG+zVzJdDG6mkDgRu02TquZ8WgiZoSRsjQ6aa7l1Gg2ylXKt+X/6VefFKSkiqIi6AgBDwRbr7LeVxxhiL75LzT62K2SjZY8erVTjeGeLW7i7x0HVaMjIhj1uyXkZ11uyXCjavZQyt+92zDGN8ptm73CL+SxSN30tO7fr4PfxPQaDmVvxvBA3RVXCZGRPIsdkvMva61XFRQREWkzCIiAIiIAiIgCIiAIiIAiIgPl3BQN7TcAgzxxGBr68kUnDTjE3/ACU8yoM9rH8ed4/sKb7IK60J/wDYfw+xCzvZo1SiIuuKkKkmndu/RKqqP9h3kU6g6Y2KQy2OglcAC+mjcdPFoXtVowT+Blk5/wDl1P8AZtV3XzmfKTOiXQKw5jtc7L3EjWglxtNUABzPcuV+VsxbEZ8K3eFp0MlDM0HprGQva+U0JdGc1R7I8kVGew3yCqvoq6HOsIiIDbXZIOmeFt//AE6v7NTjCgl2WZ2wZ5WEuLR3jZ4xqeZid/kp2N4LkNdX/ZXw+5bYL/t/qVREVMTQiIgCIiAIiIAiIgCIiAIiIAqOOgQ6b1ovtU5o/epYjhayVOzfLlERLIw76SA7i7wc7eB0Gp6Ldj0TyLFXDqzCyahHiZqrtU5pffTfDhOy1G1ZbbL/ACiRjtW1VQ3cd/NjOA6nU8gtGIBp5abkXd42PDHrVcfIorLHZLiYREW8wCuGG7rNYsQ269UwJmoaqOoYBzLHA6e/grei8lFSWzG+x0sw9dqK+2SivFumbNSVsLZoXjm1w1+rgriFC7s650uwM773cRd9Ph+WTailYNp9E48SB+Uw8SBvHEa6kKX+H71ab9b47hZrjTV9JINWywSB7ffpw8iuEzcKzFm01y8mXtNytjuupclQ8U1GvFY1jvG+GMF219fiG6w0rQPg4QdqaU/FYwbyfq8QokYym+GK3ZtbSW7LJ2gcWQ4Sysu9b3obV1ULqOjbrvdLIC0EeQ1d7lAMDQADkFnudeZdzzIxIKyZjqW10urKCj2te7aeL3ci93M8huHjgS7TSsN4tPe6vqU2Vd2s+XRBEX60dNUVlZDR0kMk9RPI2OKKMaue9x0DQOpKs20uZGMjyvwXc8eYwpLBbtWNeduqqNNRTwj2nnx5AcyQp/4TsVsw1h+jsdnpxBRUcYjiZz8SepJ1JPUrDcgstoMu8INgnbHJeq3SW4TN3+tyjafit4eJ1PNbHC4rVM95VnDHwr+blzi0dnHd9WVREVYSgiIgCIiAIiIAiIgCIiAIiIAiIeCAoVBjtY/jzvP9hTfZBTmd7KgZ2mZxPnhiMt/NyxxnfrvETf8ANXWgrfIb932IWd7NfE1uiIuuKkKjvYPkVVUfvY7yKA6T4KBbg2yAggi3wAg8R8G1XdeOyRmGy0MROpZTxt18mgL2L5zPnJnRLoF+VYzvaOaP48bm/SF+qLE9OY9VAaaqlpjrrDI6M6/JJb/Bfkr/AJi0Rt2P8Q0DhoYbpUN06ayOI+ohWBfRa5cUEznZcmwiIszwzfIar9CzlwpOXbLfui2N2/k5rm/xC6Ct4Lmrhau+5eJ7Tci7ZFJXQTk+DJGuP1BdKWHUajgd65bX4f3YS9xZ6e+60fSIioCwCIiAIiIAiIgCIiAIiIAiErzXGtprfQz11bPHT01PG6SWWR2jWMA1JJ6AIebmNZsY4tuAMG1V9rtJJQO7pKfXR1RMR6rB4cyeQBUAcSXm44iv1Ze7vUGorqyUyTPPDU8AOjQNAByACzDPbMepzFxg+sY6SOz0m1FboHbtGa75CPjO0BPQaDktfLs9Kwf6avil4n8vcU+Vf2stl0QREVqRQiIgCIiAL32W83eyVPpNmulbbp/6SlndGT9BXgReSipLZoLl0MxmzSzIlg7l+OL7saaHSrcCfeN6xStqamtqXVNZUzVM7/almkL3nzJ3r8UWEKa4eGKR7KTl1YREWw8ClJ2Rcru4hZmDfaf4WVpFphe3exh3Gcg8zwb4anmFqzs65ZyZg4sE1fE4WC3Oa+tdwEzuLYQfHieg8wpz08McMLIYY2xxMaGsY0aBoG4ADkNFz2s5/Cuwr6vr9iww6N3xyP0A3KqIuYLMIiIAiIgCIiAIiIAiIgCIiAIiIAiIUBQ8NDzXPLOqsbX5uYrqmnUOukrR+oQz/pXQuZ7Y4nSPIDWAuJPAAb1zRvlYbjfLhcSSTVVUs+p+W8u/iug/D8P7k5e4r8991I8aIi6grAvZZYPSrzQUw1Jmqoo9P0ngfxXjWUZTUIuWZ+GKEjUS3SDUafFcHf8AStdsuGDl6Iygt5JHROJuxExnxWgL6Qbxqi+dnQhDvBCIeCAgT2mLd9zc7sRRgbqiWOqB695G0n61rhb87bdrFNmFaLqxmja63bDjpxfE8gnXye0e5aDXeafPtMaD9305FDfHaxhERTDUDrodOOm5dG8s7q295fWC6tftmpt0L3nXX1tgB394Fc5RuKmz2QLyLnk7S0TngyWuqlpHDo3Xbb9T1Q69XvTGfo/qTsCW02jcaIi5UtQiIgCIiAIiIAiIgCImqAo4kKKfa6zR9OqpMv7FUfyaB4N2lYf5yQbxD5N4u8dByK2p2kszm4Bwt6JbZmHEFyY5lIOJgZwdMR4cB1PgCoOyPfJI6SR7nvc4uc5x1Lid5JPMnjqr/RsDjfbzXJdPuV+ZfsuCP6nyiIupKwIiIAiIgCIiAIiIAiL02ygrbpcILfbaSasrJ37EMELC57z0AXjaS3YXM8y27krkffcduiut0720YeJ179zdJakdImnl8s7umq2rkn2dqO19xfceRRVteCHw20HahhPEd4fzjvD2R4qQ8bGsaGNaGtaNAANAAudz9Z23rx/3+xYUYW/en+xacGYYsmErFDZLDQso6OEkhrTq57jxe4ne5x5kq9aIi5ttye7LJJJbIIiLw9CIiAIiIAiIgCIiAIiIAiIgCIiAIURAYpm5dhZMssR3Iv2DDbptg9HOaWt+twXOxuugB46KanbGvIt2Ubre1+zJdK2Kn06sbrI76mqFq6vQa+GmU/V/Qqc6W80vQoiIr0hBbS7Ktu+6Gd1ncW7TKSOepd4FsZDT9JC1apEdhy1GXFuIby5mraahjpmuPWR+0fqjH0qFqNnZ4s3+n7m7HjxWxRLUcAiBFwhehDwREBH3ttWY1WA7TemtG1b7h3bzpv2JWkf4mtURV0HzxsBxJlPiK1xt2pjRumhAG/vI/Xbp4kt09657g6gHqNV1uhW8WO4ejKjOhtZv6hERXZDCkb2Hr8IMQX7Dcr9G1dOyrhaTu2ozsu08SHN/ZUclmWSWIxhbNOw3Z79iAVQgqD/spPUd+8H3KHn09tjTh5m2ifBYmdCgqr5ad3HVfS4MvgiIgCIiAIiIAiJqgBVhx5ii1YOwrW4gu8uxTUrNQ0H1pXnc1jernHd//FepZGRxufI9rWNBLnOOgAHElQe7SWZz8e4p9Atkzvvetry2lA4VEnB0x/c3w381OwMN5VvD5LqaMi5VR38zBMeYpumM8VVuIrvJrUVL9WsB1bDGPZjb4NH16nmrEiLuIQjCKjHoikbbe7CIiyPAiIgCIiAIiIAiLfOSXZ8ueJO4veMmz2u0HR8VJ7NRUjiCf6Nh/aPhxWjIya8eHFYzOuuVj2ia3ywy4xLmDdDS2Wl2KWNwFTXTAiCAdCfynfJG/wAhvUzspsq8M5eUGlshNVcpG7NRcZwO9k8B8RvyR7yVl9is1ssVqgtVoooKGip27MUELA1rR/E+J3le4DQLkM7U7Mp8K5R9PuW1GNGrm+bA5KqIq0lBERAEREAREQBUVVQrwDUJqowdr/F+KsOY0slNYMQ3K2QTW58kkdNMWB7hKQCfHTctJf6Ucx/68X7/AIsq3xtHsyKlYpLmQ7MyNcnFo6GahNQuef8ApQzG/rxfv+LKf6UMxv68X7/iyt//AAF3+y+Zh/Xx9DoZqEBGq55/6Ucxv68X7/iypP8AZBxBfcRYJutVfrvWXOeO492ySpk23Nb3bToD01UbL0qzFr7SUkzbVlRslwpG7kVFVVZKCIiAIeCKjyA0knQcz0QESe27fxVYusuHIpAWUFK6plAPCSU6AHyazX9ZR5WV5v4i++vMy+3xr9uGarcyA66/BM9Rnu0GvvWKLvcGnsceMPPYob58djYREUs1BTH7FlmNDllV3VzSH3O4Pc0nmyMBg+sOUODwOgJ8l0UymsP3s5bWCyFuzJTUMYlHSRw2n/3nFUevW8NCh6v6E3BjvNy9DKURFyZbBERAfMoDmFrhq0jQjqFzozPsDsL5hXyxFmwylrHiEaaAxOO0zTw2XAe5dGDwUR+2zhn0PFlpxTDHpHcYDTTkD87Fvbr5sP8AcV1od/BkcD/yRCzocVfF6Ee0RF1xUhCNQR1REB0EyLxT99+V9lu75A+qEPo9Vv1Imj9V2vidAfes5HBRO7E+LRR3254NqpNI65nplICfzrBo9o826H9UqWIXB6hj9hkSh5dV8GXuPZ2laYREUM3BERAERCgCFNQte565i0uXeD5K4Fkt2qg6G3U7j7UmntkfEbrqfcOazrrlbNQj1ZjKSit2ax7XGaPoFG/AFiqdKupZrdJWHfFEeEIPxnDeejd3NRSXouFbVXGuqK+uqH1FVUSOlmlkOrnvcdSSvOu6wsSOLUoLr5lHda7ZcTCIilmoIiIAiIgCIiAK54YsF4xNeYbRYrfNX1sx9WOMcBzc48Gt8TuWZ5P5Q4kzEqmTwxm32VrtJrjKz1T1bGPy3fUOZ5KZuXOAsOYCswttgohGXAd/USetNO74z3c/IbhyCqc/Va8beMOcvoSqMWVnN8ka7yTyEs2D+4vOIxDd78NHMBbrBSn5APtOHxj7gFu0AKug6IuTvvsvnx2PdltCuMFtEIiLSZhERAEREAREQBERAFQ8VVUPFARE7cX4fYf+apPtio/KQPbi/D7D/wA1SfbFR+Xb6V+Uh/PMpMr2rCIisSOFLzsP/gBefnQ/ZtUQ1LzsP/gBefnQ/ZtVTrf5V/FErC9qSACqqBVXGlyEREAK1/2gMU/enlVebhHJsVU0PolLv0PeS+qCPIEu9yz8kKI/bVxb6fii3YQpZdYbbH6TVAHd3zxo0HxDP8am6fjvIyIx8urNGRZwVtkewNAB03IiLuyjCIiAy7JvD5xRmhYLOW7UUlW2Wfwjj9d31N0966Gs3Dhooq9iHDRmvF7xZPF6lPE2hpnEcXv0fIR5NDR+sVKsLj9bu7TI4P8AVFvhQ4a9/UqiIqcmBERACtb9o/CpxZlPdaaGPbrKJvp1MBxL49SQPNu0NPJbIXy8AtIIBB3aHms6rHVNTXkYzipRaZzEB13os2zvwk7BeZd2s7IyykdJ6TRbtxhk1c0DyOrf1VhK+hVWK2CmujOflFxezCIizPC6YTvlZhvEtuv9ASKmgqGzsGvtacWnwI1HvXRjDV4or/YKC9W6TvKWtgZPEfBw10PiOB8QuaalL2LsciWjrMB18/wkBNXbto8WE/CRjyPreRPRUWuYvaVq2PWP0J2Fbwy4H5kmNUVAqrlC1CIiAIio5AW7El4t+H7HWXm61Daeio4jLNI7k0dOpPADmSFAHNnHFxzAxhU3yt2o4P5qipi7UU8IO5vmeJPMnwC2N2qs0vvqvrsJ2So2rLbpfh5GO9WqqBuPmxm8DqdTyC0Yus0fA7GPaz8T+SKnLv43wLoERFeEIIiIAiIgCIVkOAsGYixvehasPUDqiUaGWV3qxQN+M93Bo8OJ5ArGc4wi5SeyPUnJ7IsMMcs8zIIYnyyyODWMY0uc5x4AAbyfAKSmSXZzknMN9zBjMce58NoDvWd0MxHAfIHv6LaeTWTGHsv4Y66QNul+LfXrpWaCLXi2Jv5I8eJ+pbRA04Ll8/WZT7lHJepZ0Ye3emflRUtPR0sVLSwRQQRNDI4omhrGNHAADcAv23qqKh6k8IiIAiIgCIiAIiIAiIgCIiAKh4qqoeKAiJ24vw+w/wDNUn2xUflIHtxfh9h/5qk+2Kj8u30r8pD+eZSZXtWERFYkcKXnYf8AwAvPzofs2qIal52H/wAALz86H7Nqqdb/ACr+KJWF7UkAFVUCquNLkIiE6IC04tvdDhvDlwvtxk2KWhgdNJ1Og3AeJOgHiVzoxNeKzEOILhfLg7aqq+ofPL0BceA8ANAPJSQ7aOOg2OjwHQTes/ZrLjsng381GfM+sR4N6qL66zQ8Xs6nbLrL6FTm28UuFeQREV4QghOg1RbA7P2EjjHNK1UEsZfRUr/TazdqO7jIIB/Sdst9613Wxqrc5eRlGLk1FeZMDILCpwhlbZ7XLH3dXJF6VVgjf3snrEHxAIb7lnq+WjTovpfPrLHZNzfmX8Y8KSQREWBkEREAQjVEQGgO2Zgz7rYPpsW0kWtVZiW1JA3upnkan9V2h8i5RBXTO7UNNc7dU26thbNS1UToZo3cHMcNCPoK54Zl4UqsFY3uWHKraIppSYJCP52F29j/AHt4+IK6jQsrig6X1XNFXnVbS40Y2iIugIAV0wnfbhhjEtvv9rfs1dDMJWb9A7q0+BGoPmrWh3BeSipLZ9GE2nujpHgjEdvxZha34gtkgdTVkIkA5sd+Uw+LTqD5K9LUHZTwfesJ5dbd6mlY+6TemRUTx/6VhaANejnbnEct3PVbfXz7IhGFsowe6TOgrblFN9QiIVpMyhPitGdqnNI4VsRwrZajZvdyiPeyMPrUkB3F3g928N6DU9FsXNbHFuwBg6pvtdpJIB3dLT66OnmI9Vg8OZPIAqAWJb1csR36svl3qDUV1ZKZJXnhr0A5NA0AHIBXOkYHbz7SfhXzZDy7+BcK6luRVVF15UBERAEREAQr1Wq3112uMFutlHPWVk7tmKCFhc956ABSqyS7O9HZzBfcdRxV1wBD4rcPWggPIv5SO8PZHioeXnVYsd5vn6G2qiVr5GqslcjL7jh0N2u/fWjD5O0JnN0mqR0jaeAPxzu6AqYmDsL2LCdkis9gt8VFSR79lg1c93NzncXOPUq7saGgNaAABoABwC+xwXIZmfbly73T0LemiNS5dSmgVURQjeEREAREQBERAEREAREKAprvVdR1XOzMqvr25h4ja2uq2tF1qQAJnAAd67xWP/dG4/6wrP8Afu/zXQQ0GUoqXH19xXvPSe2x0z1HVNR1XMz7pXH/AFhW/wC/d/mn3SuP+sK3/fu/zWX/AMfl/wDZ8jz/AJBf6nTLUdVQHVczH3G47Lv/ADCs4H8+7/NdGcAOLsB4fc4kk2umJJOpJ7pqr8/TnhqLct9yRj5Kub5EX+3F+H2H/mqT7YqPykD24vw9w/8ANcn2xUfl0ulflIfzzK3K9qwiIrEjhS87D/4AXn50P2bVENS87D/4AXn50P2bVU63+VfxRKwvakgAqqgVVxpcgqw49xNb8IYTuGIrm8CCjhLtnXQyP4NYPFztAr6/gobdrTMf75cTjCdqqNu02iQ9+5jvVnqeB8wze0eOvgpmBiPKuUPLz+Bpvt7KG5p7E96rsR4hr77c5O8rK6d00p5Ang0eAGgHgFbUCLuoxUUkuiKNtt7sIiLI8CmP2O8GGx4ElxLVwllbe3h0e0NC2mZqGD9Y7TvePBRgyrwlPjjHltw7CHiKaTbqpB+bgbve7z03DxIXQ2hpaeio4KOlibDTwRtiijaNzGNGgA8gAuf13K4YqlefNk/Bq3fGz9wN6qgRcui0CIiAIiIAiIgBWg+2FgE33CkeL7dDtV9maRUBo3yUpPrfsH1vIuW/F+VRDHPC+KVjJIntLXscNQ4HcQR0IW7Gvlj2qyPkYWVqyLizmOi2BnxgGXL/AB5UW+KN33Kq9ai3PPDuyd8evVh3Hw2TzWv131Nsba1OPRlDOLi3F+QW8+yrld99V8GLL3T7VltsvwEb27qqoboR5sZxPU6DkVrrKXA1xzBxjTWOi244Ae8rKkN1EEIO93meAHU+an9huzW6wWOjs1qpm01FRxCKGNvJo69SeJPMkqn1jP7GHZQfefX3Il4dHG+KXQ97dxX0iLky2C89xrKWgoZ62snjgpqeN0s0rzo1jGjUknoAv3J0Kin2us0RXVUmX9iqdaaBwN1lY7dI8bxDqOQ4u8dByKk4mLPJtUI/qarrVVHiZrDPbMapzFxi+sjc+Oz0e1FboHbtGc5HD4z+PgNByWvk47yi7uqqNUFCHRFHKbm+JhERbDEIib+SALM8rstsS5h3T0ezUwjo43AVNfMCIYfDX8p3Ro3+Q3rZOSfZ7uWIBDfMaNntlqOj4qL2KipHLa/o2H9o+CllZLTbbLa6e2WmhgoqKnaGxQwsDWtHl/HiVR5+sRq3hTzfr5E3HxHLnPoYllPldhrLu37Frp/SbjI0CouE7QZpfAfEb8ke/VZ4ECLlbLJ2S4pvdlpGKitkERFiZBERAEREAREQBERAEREAQohQHOPM38Y2Jfnap+1cseWQ5m/jGxL87VP2rljy+iU+zj8Dnp+JhERbDEo/2D5LpDl7+AWHvmum+yaubz/YPkukOXv4BYe+a6b7Jq578QeGH6lhp/WRGDtw/h9h/wCapPtio/KQPbh/D7D/AM1SfbFR+VhpX5SH88yPle1YREViRwpedh/8ALz86H7NqiGpediD8ALz86H7Nqqdb/Kv4olYXtSQCHcixfM3G1pwHhOqv12eCGDZp4A4B9RKfZY3+J5DUrjoQlOSjFc2XDaS3Zg3abzPbgjC/wBybVOBiC6RlsOnGni3h0p6Hk3x38lCUkkkkknqTrqrvjPEl1xbiasv95m72rqn7RA9mNo3NY0cmtGgCs67jT8JYlW3+T6lJfc7Zb+QREU80BDwRbDyAwBJmBjyCknjcbRRbNRcHjgWA+rHr1eRp5Bx5LXdbGmDnPojKEXOXCiQvZDwCcO4NkxRcYCy5XpodEHD1o6Yb2Dw2j6x8Nnot6jgvzhjZFEyONjWMY0Na1o0AA4ADov0XA5F8r7HZLzL6uCriooIiLSZhERAEREAREQBDwREBgGeeX1PmFgee2Maxlzp9Z7dM78iUD2SfiuHqn3HkoHxWi6SX1tijoZ3XR1R6KKXZ+E73XZ2NOuq6XOGo0WHQZd4aizLlx6yjIu0tOISd2wHcDKB8ct0aT0HirbT9TeLCUGt15fEiZGMrWmjw5GZdUeXeDo6D4OW61QEtxqWj25NPYB+K3gPeea2AOCoOCqqyyyVs3OT5skxiopJBChVhx5im14OwtW4gu8uzTUzNQ0H1pXnc1jerid318ljGLk1GPU9bSW7ME7SOZ0eAcKmjt0zTiC5McykaN5gbwdMR4a7up8ioOyPfLI+WV7nyPcXOc46lxO8knmSd6vePcU3TGeKq3EN3k2qipf6rAfVhjHsxt8APp3nmrEu307CWLVt/k+pSZFztlv5BERWBoCItk5O5P4jzDqWVUbTbbG1+ktwlZud1bE38t3j7I59FquuhTBzm9kZQhKb2iYVhbD95xReYbPYLfNXVsvsxxjc0fGceDWjqdApfZJZC2bBpgvOIe4u9+aA5hLdYKU/IB9p3yj7gFsLLvAmHMCWVtssFCIgdDPO/R01Q7q93Py4DkFlK5TP1ezIbhXyj9S1oxI185c2UaAFXgiKnJgREQBERAEREAREQBEQoAiom9AVRU3pvQFUKpqiA5yZm/jGxL87VP2rljyyHMz8Y2Jfnap+1cseX0Sn2cfgc9PxMIiLYYlH+wfJdIcvfwCw981032TVzef7B8l0hy9/ALD3zXTfZNXPfiDww/UsNP6yIwduH8PsP/NUn2xUflIHtw/h9h/5qk+2Kj8rDSvykP55kfK9qwiIrEjhS07Dkj3YNxBGT6jbiwgdNYxr+5RLUpextdLfZcvMV3W61kVHRUtaySaaR2jWNEX/AM3c1U60m8VpeqJWHytJCYmvdtw5ZKq9XeqjpaGljL5ZHngOQHUk7gOZKghnRmPcsxsVOuE4fT22nJZb6QndEzX2nacXu3En3Dgrrn5mzXZjXr0ejM1Lh6kf/JaZx0Mrv6aQfG6D8keOq1hyWvStN7BdrZ4n8jLKyeN8MegREV0QwiInQH70FJU19dBRUUD6ipqJGxQxMGrnvcdAB71PnI/AFPl9gentRDH3GbSa4Tt/OTEbwD8Vo9UeWvNai7IeV5hjbmDfafSWRpbaYZG+y07nT6dTvDfDU8wpMt4Lk9Zzu1l2MOi6+9lrh0cK45dR4KqIqMnBERAEREAREQBERAEREAQIiAJqioUB8Syxsjc972sa0bTnOOgAHElQf7SWZzseYqNvtk7jh+2PcymA3Cok4OmPXo3XgN/NbU7XGaP3Po34BsVTpWVLAbpMw74ojvEQPxnDeejfNRS8l02i4G39+f6fcrMy/f8Atx/UqqIi6IrwvunhmqJ44IIpJZZHBkcbGlznuPAADeT5LIMAYKxFjm9NtWHqB08g0M0zvVhgb8Z7uQ8OJ5BTJyayZw5l9BHWODbnfXN0kr5WfzevFsTfyB48TzPJV2dqVWKtusvQkU40rfgatyT7OTn9xfMwoi1u58NoDuPMGYj/AAD3nkpOUlNDS08dNTQRwQRNDY442hrWNHAADcAv2AAVVyGTl25MuKx/oW1VUa1tEBERRzaEREAREQBERAEREAREQBY3mbigYLwPcsTuonVooWNcYBJsF+r2t9rQ6e1rwWSLW3ac/EXib+xj+2YttEVO2MX0bRhY2oto1aO1hT/1Hn/5i3/sT/xYQf1Hm/5i3/sUXuaouw/4fE/1+bKj+rt9SUX/AIsIP6jzf8xb/wBif+LCD+o83/MW/wDYouon/D4n+vzY/q7fUmPlj2hYsb44t+GWYVloTWF4791YHhmywu4bI14Leo4BQQ7Lv48sPec/2L1O9c7quNXj3qNa2WxYYlkrIbyOcmZn4xsS/OtT9q5Y8shzM/GNiX51qftXLHl2NPs4/AqJ+JhERbDEo/2D5LpDl7+AWHvmum+yaubz/YPkukOXv4BYe+a6b7Jq578QeGH6lhp/WRGDtw/h9h/5qk+2Kj8pA9uH8PsP/NUn2xUflYaV+Uh/PMj5XtWERFYkcL2tutxZZH2RlZK23SVAqX04OjHygbIc7roOGvBeJF40n1CewCIi9AREQBbW7OeVs2YGJvTrlC5uHbfIDVPO70h/EQtPjxcRwG7iQsYynwFdswsVRWe3B0VOzR9bVluraeLXefFx3ho5nyKnthDDtqwrh+jsVmphT0VKzZY3m483OPNxO8lUuraj2EeyrfefyJmJj8b4pdC500EVPCyGCJkUUbQ1jGDRrQBoAByAC/VEXIluEREAREQBERAEREAREQBERAERUKALX2euY1Jl3g6SuBjlutVrFbqcn2pNN7yPit4nruHNZhiO82/D9krLzdaltPRUcRlmkPIDp1J4AcyVAHNnHNxzAxjU32t2o4BrFRUxO6CEHc39I8XHqfJWel4LyrN5eFdfsRcm/so7LqzGrjWVVxr6i4V9RJU1dTI6WaaQ6ue9x1Lj71505L12i23C8XKG22qjnra2d2zFBCwue8+A/jwC7PeMV6Ipkt3seQ6cSdy3FkpkVfMbOhu97760YfJ2g8t0mqh0jaeDT8c+4FbWyS7PFDZDBfMcMhuFzGj4qAHap6c8tvlI7+6PHipBMAa0NaAANwGi57P1rrDH/f7FjRh796f7Fqwjhmx4UssVosFvioqSMeywb3Hm5x4ucepV3AAOqqi5uTcnu+pYpJckAiKhIA1K8PSqpqtOY+7QuDMLYjhs0Dam8lkmzXTUbmllN4AndI4cwPp13LY+DsV4fxda23PD10p6+nO52w71oz0e072nwIW6ePbCKnKLSZrjZGT2T5l9CIEWk2BERAEREAREQBERAFrbtOfiLxN/Yx/bMWyVrbtOfiLxN/Yx/bMW/F9tD4r6mu3wMgZzVFXmqL6CUAREQGzey7+PLD3nP9i9TvUEOy7+PLD3nP8AYvU71yOu/mV8PuW2D7N/E5yZmfjGxL861P2rljyyHMz8Y2JfnWp+1cseXVU+zj8Crn4mERFsMSj/AGD5LpDl7+AWHvmum+yaubz/AGD5LpDl9+AWHvmum+yaue/EHgh+pYaf1kRg7cP4fYf+apPtio/KQPbh/D3D/wA1SfbFR+VhpX5SH88yPle1YREViRwiIgCIiALIcvsH3vHGJIbFY6fvJn+tLK7+bgj5yPPID6SdwTL/AAde8cYkhsdip+8mf60srtRHBHrve8jgB9JO4Kc+UmXdly6w422W1vfVcuj62te3R9Q/r4NHJvLzJKq9R1GGLHhjzk/kScfHdr3fQ9WV+BbNgHC0NktEep9upqHD4Sol03vd/AcANyytBwRcbOcpycpdWXKSS2QREWJ6EREAREQBERAEREAREQBERAF8vVdVoztU5pDCti+9ayVOl7ucR72SN3rUsB3F3g528DoNT0W7HolfYq4dWYWTUI8TNU9qrNH76b47CVlqdqy22U+kSMduqqgbjv5tZvA6nU9FoxAOAA1J3DTmt/5Jdnm4X4wXzG8c1vtZ0fFQDVtRUDlt842+HtHw4rs+KjTqUm9kvmU208ie6Na5WZaYmzDuncWen7qiicBU18wIhhHT5Tvkj36cVM7KnK/DWXlu7q1U/f18jQKivmAM0vgPit+SN3XVZbZbVbrNbYLbaqOCjo4G7EUMLA1rB4Afv5r2lcxnanblPZco+n3LOjGjVz8ygVUCKtJIQqhOi1znDm7hvLykMNQ70+8vZtQW+Fw2vB0h/Ib9Z5ArOuqdsuGC3ZjKSit2Znia/wBnw3Z5rvfLhBQ0UI1fLK7TyAHEk8gN5UQs7M+7vi8z2bDJntNiJLXya7NRVD5RHsMPxRvPM8lrvMbHuJMfXk3G/wBZttaT6PSx6iGnHRrevVx3lYuuqwNHhTtO3nL5Iqr8yU+7DkgAB/8AOCuWG79ecN3RlzsNzqbdVs4SQv0JHRw4OHgdVbUV1KKktmuRDTae6JQ5Z9p2N4ioMe0Hdu3N+6NEzVp8XxcR5t18uSkRhzEFkxFbm3CxXSkuNK785TyBwB6HmD4Fc1lcsPX284euDa+xXSrttU385TylhPgdNzh4FUmVolVneqfC/kTas2UeUuaOlQIVeaiRgPtQX2h7umxfaYrtENxqqTSKfzLfYd7tlb6wRm/gDF2xHbb/AAQVbv8A6Ss+Am16AO3O/VJXP5Gn5FHijy9VzLCvIrs6Mz1F8teCAQdQeB6r6B1Gqhm4ImqaoAiIgC1t2nPxF4m/sY/tmLZK1t2nPxF4m/sY/tmLfi+2h8V9TXb4GQM5qirzVF9BKAIiIDZvZd/Hlh7zn+xep3qCHZd/Hlh7zn+xep3rkdd/Mr4fctsH2b+JzkzM/GNiX51qftXLHlkOZn4xsS/O1T9q5Y8uqp9nH4FXPxMIiLYYlHb2keCkNe+0lV0OFLZYsHWzuZ6ahhp5a+taHEObG1p7uMbuIOhcfco9c0Ue/Fqva7Rb7GcLZQ34fMuOIb3d8Q3SW6Xy5VNwrJfalnkLjp0HIDoBuVuRFvUVFbJGDe73YREXoCIiAFZflbl3iDMO+i32eDYpoiPS62Rp7qnaep5uPJo3n61lGSOSt7x/URXOvEtrw6Hauqi3SSoA4tiB49Ns7h4lTPwlhuz4VsdPZrFQxUdFAPVYwb3Hm5x4uceZKptQ1aNCcK+cvoTMfFdnel0LZllgSw4Aw+y0WSn0J0dUVLwDLUP+M4/uHAcllSBFyU5ynJyk92y2ilFbIIiLE9CIiAIiIAiIgCIiAIiIAiIgCHgi89wq6agop62tnZBTQRuklledGsYBqST0ATryBjGa2OLdgHB9Vfa/SSQDu6Wn10dUTEeqweHMnkAVBeGmxZmZjed9PTz3a9XGUyy7A9Vo4ak8GMaNANdwAW5rrY8WdojHBu0XfWnBVE90NFUzx+0zX1nsZ+XI7TeeDRoNd2ikVl5gfDmBbOLXh+gbA06GaZ/rTTu+M93Enw4DkArym+vTq+XOx9fcQZwlkS9Io17knkRZMF9zeL73N3v4Ac17m6wUp/2bTxd8s7+gC3PoNNd6+tE0VRffZfLise7JcK4wW0UU0VURajMIURAYVnCcdHBlSMvxSfdUj1u9PwgZpv7rX1dvptbveoB3xtzbeKsXptW25d6fShVbXfbfPb2t+vmumBA6LBM1cq8KZhUh+6tL6PcWN0huFOAJmdAfjt+SfdpxVtpmoxxXwzjyfn5kPJx3bzTOfyLYWamUOLsv5Xz1lMa+066MuNM0mMDl3g4xnz3dCVr3VddVdC2PFB7oqZRcHtIIiLYeBERAEIB3EAjoURAZbhLMrHWFS1tlxNXwws4QSv76L9h+oW28L9qfEFKGRYjw7Q3Bg3GWkkMEh/VO00n3hR3RRLsHHu8cUbYX2Q6Mmph3tKZdXIMbcJLjZ5CPW9Jpi9g8NqPa/ctg2LMHA97DRasV2apc7hGKprX/ALJIP1LnUhAI0LQfMaqts0Gl+CTRJjnzXVHTmOWOVu1FI17erTr+5fWu7fu81zRoLtdbfp6BdK+j04CnqXxge5pCyKhzPzFog1tNjW+Na3g01JcP72qiS/D9n+M0bVnx80dDtR1Wtu05+IvE39jH9sxRTpc881aduyzFkz92mstPE/372rz4nzlzExNh+psN6vcNTb6pobMwUUTHOAcHD1g3XiBwXlWi312Rk2uTQnmwlFowDmqKqoupKwIiIDPOz/erXh7NqzXi9VsdFQU3fGWZ4JDdYnAcATvJAUkcQdpjL6gLmW2O6Xh7eBgp+7Yf1nkfuUMlVV+TptOTZ2k9/QkVZM6o8MS44ouTb1ia6XdkToW1tZLUNjcdS0PeXaE+GqtqIp6iorZEdvcIiL0BERAEREARNR1WxcqsnsW4/ljqKam+51n19e4VTSGHr3beMh8t3UrVddCmPFY9kZQhKb2ijAaCjq7hWw0NBTTVVVO8MihhYXve48AAN5Kk7kp2c2Uzob5mDGyaUaPitLXbTGHkZnDc4/IG7qTwW3cq8rMK5fUgFqpO/uLm6TXCoAdNJ1APBjfkj36rPNAuYztZlbvCnkvXz/8ACzow1DnPqflBFHDCyKKNscbGhrGNGgaBwAA4BfqmgRUZOCIiAIiIAiIgCIiAIiIAiIgCIiAIiIArDi/DFHimkit91fJJbBIJKijadltVpoWtkPEsB3lvMga7gQb8i9Tae6PGk+p+NLTxU0EcFPEyKGNoYyNjQ1rWjgABuAX7BEXh6EREAREQBERAEKIgPymiZNG+KWNr43tLXNcNQ4HiCOYWjM0+zhhzEBluOFJGWC4uO0YQ0upJD+iN8Z8W7vBb4VOa3UZFtEuKt7GFlcZraSOdOO8B4rwRWdxiK0T0sZOkdS0bcEn6Mg3e46HwWM+5dNLhQ0lfRSUdbSwVNNKNmSKVgexw6EHcVo7MXs04VvPeVmFqh9grDv7jQyUrz+j7TPcdPBdFi67CW0bls/XyK63Ba5wIeIs7x7lLjzBhfLdLJLUUTCf5bRgzQ6dTpvZ+sAsEB1V5XbC1cUHuiFKLi9mgiIthiEREAREQBERAVVERAEREAREQBERAEREAREQBE4EePDxWwMBZO49xiY5aGzPoqF+h9Mr9YYiDzaCNp/uC12211Lim9kZRjKb2ijX6ynAOX2Lcc1Yhw9aZZ4Q7SSrk9Snj/Sed3uGp8FKDLvs24SsRiq8STyYhrW6Hu5B3dMw/oA6u3/GOngt20dJTUdKympIIqeCMaMjiYGtaOgA3BUWVrsY8qFu/Um1YLfOZpLK7s5Yaw6YrhieRuILk3RwjczZpYz4MO9/m7d4LeEUTYo2RxsaxjAGta0aAAcAB0X6Dgi56/IsvlxWPcsYVxgtooIERaTMIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAiIgCIiAIiIAqFoKqiApsha+xxk1l9i0vmrrFFSVbt/pVD8BJr1Ozud7wVsJFnXbOt7wezMZRUls0RMxl2W7zS7c+FL/T3CPiKeub3Mnltt1afeAtPYry7xvhZzzfMNXGmiZrrO2LvIdOu2zUD36Lonp4IRu004q1p1zIhyn3l+xEnhVy6cjmHz0HEcQi6G4pyzwHiQl13wrbJ5TqTKyERya9dpmh181rTEHZewTW7T7RdLvaXkbm942eMe5w2v7wVrVrtEvGmvmRpYM105kPUUg752WMUU5c6z4ktVcwcGzxvgeenDaH1rCrtkJmnbgXfe2Kxo50dVHJr7iQp8NRxZ9Jr6GiWPbHrE1iiya45f45txIrcH32LTiRQvePpaCFYauiraR2zV0dTTnpLE5n7wpEbYS6NP9TU4tdUedE1TVZ7o8CJqmq93QCL1UduuNaQKK31dTrw7mBz+enIdVkFty5x7cdPQ8G32TXhtUbo/rfotcra4+JpfqZKEn0RiqLadp7P2aVeA51ghomk7zV1kbCPcCSs1sfZVxDMQb1im20bObaWB8zvr2Qo1mo4tfWa+psjjWy8iO6c9OfTmpkYe7MWA6HR90rLtd3gglr5hCz6GAHTzJWy8L5eYJwyWmy4YtlJI06iUQB0gPXbdqfrUC3XqY+BN/I3xwZvq9iDmE8sse4oLHWfDFe+F/Comj7mHTrtP01HlqtxYM7LNfNsT4txFFStOhdTW5neP8jI4aD3NKlVom5Vd+t5Fnh7pKhhVx68zA8D5R4BwgWS2uxQS1bdP5XV/Dza9QXbm+4BZ5shVRVM7J2Peb3ZKjFRWyRQDRVRFiZBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREAREQBERAEREB//2Q=="
+           alt="Finance Navigator"
+           style="width:100px;height:100px;object-fit:contain;margin-bottom:8px;display:block;margin-left:auto;margin-right:auto;">
+      <div style="font-size:20px;font-weight:700;color:#1A3988;letter-spacing:.02em;">FN Dashboard</div>
+      <div style="font-size:13px;color:#888;margin-top:4px;">ログインしてください</div>
+    </div>
+    <!-- フォーム -->
+    <div style="margin-bottom:16px;">
+      <label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px;">ID</label>
+      <input id="loginId" type="text" placeholder="IDを入力" autocomplete="username"
+        style="width:100%;box-sizing:border-box;padding:11px 14px;border:1.5px solid #d0d5dd;
+               border-radius:8px;font-size:14px;outline:none;transition:border .2s;"
+        onfocus="this.style.borderColor='#1A3988'" onblur="this.style.borderColor='#d0d5dd'"
+        onkeydown="if(event.key==='Enter')document.getElementById('loginPw').focus()">
+    </div>
+    <div style="margin-bottom:24px;">
+      <label style="font-size:12px;font-weight:600;color:#444;display:block;margin-bottom:6px;">パスワード</label>
+      <div style="position:relative;">
+        <input id="loginPw" type="password" placeholder="パスワードを入力" autocomplete="current-password"
+          style="width:100%;box-sizing:border-box;padding:11px 40px 11px 14px;border:1.5px solid #d0d5dd;
+                 border-radius:8px;font-size:14px;outline:none;transition:border .2s;"
+          onfocus="this.style.borderColor='#1A3988'" onblur="this.style.borderColor='#d0d5dd'"
+          onkeydown="if(event.key==='Enter')doLogin()">
+        <button onclick="togglePw()" tabindex="-1" style="
+          position:absolute;right:10px;top:50%;transform:translateY(-50%);
+          background:none;border:none;cursor:pointer;padding:4px;color:#888;">
+          <svg id="pwEyeIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>
+          </svg>
+        </button>
+      </div>
+    </div>
+    <button onclick="doLogin()" style="
+      width:100%;padding:13px;background:linear-gradient(135deg,#1A3988,#4A7BFF);
+      color:#fff;border:none;border-radius:8px;font-size:15px;font-weight:600;
+      cursor:pointer;letter-spacing:.03em;transition:opacity .15s;"
+      onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+      ログイン
+    </button>
+    <div id="loginErr" style="
+      display:none;margin-top:14px;padding:10px 14px;
+      background:#fef2f2;border:1px solid #fca5a5;border-radius:8px;
+      font-size:13px;color:#b91c1c;text-align:center;">
+      IDまたはパスワードが正しくありません
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  /* 認証情報 */
+  const VALID_ID = 'dashbord_FN';
+  const VALID_PW = 'dashbord12345';
+  const SESSION_KEY = 'fn_dash_auth';
+
+  /* セッションが残っていれば即座に解除 */
+  if (sessionStorage.getItem(SESSION_KEY) === '1') {
+    document.getElementById('loginScreen').style.display = 'none';
+  }
+
+  window.doLogin = function() {
+    const id = document.getElementById('loginId').value.trim();
+    const pw = document.getElementById('loginPw').value;
+    const err = document.getElementById('loginErr');
+    if (id === VALID_ID && pw === VALID_PW) {
+      sessionStorage.setItem(SESSION_KEY, '1');
+      const screen = document.getElementById('loginScreen');
+      screen.style.transition = 'opacity .3s';
+      screen.style.opacity = '0';
+      setTimeout(() => screen.remove(), 300);
+    } else {
+      err.style.display = 'block';
+      document.getElementById('loginPw').value = '';
+      document.getElementById('loginPw').focus();
+      /* エラー時に入力欄を振動 */
+      const inp = document.getElementById('loginPw');
+      inp.style.borderColor = '#ef4444';
+      setTimeout(() => inp.style.borderColor = '#d0d5dd', 1500);
+    }
+  };
+
+  window.doLogout = function() {
+    sessionStorage.removeItem(SESSION_KEY);
+    /* ログイン画面を再生成して表示 */
+    location.reload();
+  };
+
+  window.togglePw = function() {
+    const pw = document.getElementById('loginPw');
+    const icon = document.getElementById('pwEyeIcon');
+    if (pw.type === 'password') {
+      pw.type = 'text';
+      icon.innerHTML = '<path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23" stroke="currentColor" stroke-width="2"/>';
+    } else {
+      pw.type = 'password';
+      icon.innerHTML = '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/>';
+    }
+  };
+})();
+</script>
+
+<!-- ══ Upload Overlay ══════════════════════════════════════════ -->
+<div id="uploadOverlay">
+  <div class="ov-logo">
+    <div class="ov-logo-circle">
+      <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+    </div>
+    <div>
+      <div class="ov-brand">FINANCE NAVIGATOR</div>
+      <div class="ov-sub">FN 経営ダッシュボード 2026</div>
+    </div>
+  </div>
+
+  <div class="dropzone" id="dropzone">
+    <div class="dz-icon">📊</div>
+    <div class="dz-title">Excel ファイルをドラッグ＆ドロップ</div>
+    <div class="dz-sub">または下のボタンをクリックしてファイルを選択<br>対象ファイル：FNダッシュボード用.xlsx</div>
+    <label class="btn-upload">
+      ファイルを選択
+      <input type="file" id="fileInput" accept=".xlsx,.xls" style="display:none">
+    </label>
+  </div>
+
+  <div class="ov-note">
+    読み込み対象シート：PL ／ パイプライン ／ 稼働管理 ／ 祝日マスタ<br>
+    データはブラウザに自動保存されます（次回以降は自動読み込み）
+  </div>
+</div>
+
+<!-- ══ Dashboard ═══════════════════════════════════════════════ -->
+<div id="dashboard" style="display:none">
+
+  <!-- Header -->
+  <div class="hdr">
+    <div class="hdr-left">
+      <div class="hdr-logo">
+        <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67V7z"/></svg>
+      </div>
+      <div>
+        <div class="hdr-title">FINANCE NAVIGATOR｜FN 経営ダッシュボード 2026</div>
+        <div class="hdr-sub">売上Forecast（確定案件のみ ～12月）｜販管費実績（～4月）｜稼働管理（対象月）</div>
+      </div>
+    </div>
+    <div class="hdr-right">
+      <span class="hdr-badge" id="lastUpdated">未読み込み</span>
+      <label class="btn-reload">
+        📂 Excel を更新
+        <input type="file" id="fileInputHeader" accept=".xlsx,.xls" style="display:none">
+      </label>
+    </div>
+  </div>
+
+  <!-- ══ Tab Bar ════════════════════════════════════════ -->
+  <div class="tab-bar">
+    <button type="button" class="tab-btn active" id="tab-pl"     onclick="switchPage('pl')">📊 PL詳細</button>
+    <button type="button" class="tab-btn"        id="tab-keiei" onclick="switchPage('keiei')">🎯 営業・稼働管理</button>
+  <button onclick="doLogout()" title="ログアウト" style="
+    margin-left:auto;margin-right:12px;
+    display:flex;align-items:center;gap:6px;
+    background:transparent;border:1.5px solid #1A3988;
+    color:#1A3988;border-radius:7px;
+    padding:5px 13px;font-size:12px;font-weight:500;
+    cursor:pointer;transition:all .15s;white-space:nowrap;"
+    onmouseover="this.style.background='#1A3988';this.style.color='#fff'"
+    onmouseout="this.style.background='transparent';this.style.color='#1A3988'">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+      <polyline points="16 17 21 12 16 7"/>
+      <line x1="21" y1="12" x2="9" y2="12"/>
+    </svg>
+    ログアウト
+  </button>
+  </div>
+
+  <!-- ══ 経営ページ ══════════════════════════════════════ -->
+  <div id="page-keiei" style="display:none">
+  <div class="wrap">
+
+    <!-- ① KPI 4枚（2ブロック構成） -->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+
+      <!-- 左ブロック：確定売上 -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:var(--navy-pale);border-radius:8px;padding:10px;border:1px solid var(--border)">
+        <div style="font-size:9px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.8px;grid-column:1/-1;margin-bottom:2px">
+          📊 確定売上（Forecast確定案件のみ）
+        </div>
+        <div class="kpi" style="--kc:#1C2D6B;margin:0">
+          <div class="kpi-lbl">年間売上合計</div>
+          <div class="kpi-val" id="kv1" style="font-size:19px">--</div>
+          <div class="kpi-note">目標 ¥10M 対比</div>
+          <div class="kpi-bar"><div class="kpi-fill" id="kb1" style="width:0%"></div></div>
+        </div>
+        <div class="kpi" style="--kc:#C0392B;margin:0">
+          <div class="kpi-lbl">予算差 ／ 予算比</div>
+          <div class="kpi-val" id="kv2" style="font-size:17px">--</div>
+          <div style="display:flex;justify-content:space-between;margin-top:3px">
+            <span style="font-size:10px;color:var(--muted)" id="kn2">--</span>
+            <span style="font-size:13px;font-weight:700" id="kv2r">--%</span>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill" id="kb2" style="width:0%;background:#C0392B"></div></div>
+        </div>
+      </div>
+
+      <!-- 右ブロック：確定＋パイプライン -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;background:#FEF6E0;border-radius:8px;padding:10px;border:1px solid #F0D080">
+        <div style="font-size:9px;font-weight:700;color:#A06000;text-transform:uppercase;letter-spacing:.8px;grid-column:1/-1;margin-bottom:2px">
+          🔮 確定売上 ＋ パイプライン加味後
+        </div>
+        <div class="kpi" style="--kc:#D0480A;margin:0;background:#FFFAF0">
+          <div class="kpi-lbl">売上見通し合計</div>
+          <div class="kpi-val" id="kv5" style="font-size:19px">--</div>
+          <div class="kpi-note" id="kn5">パイプライン: ¥0</div>
+          <div class="kpi-bar"><div class="kpi-fill" id="kb5" style="width:0%;background:#D0480A"></div></div>
+        </div>
+        <div class="kpi" style="--kc:#D0480A;margin:0;background:#FFFAF0">
+          <div class="kpi-lbl">予算差 ／ 予算比</div>
+          <div class="kpi-val" id="kv4" style="font-size:17px">--</div>
+          <div style="display:flex;justify-content:space-between;margin-top:3px">
+            <span style="font-size:10px;color:var(--muted)" id="kn4">--</span>
+            <span style="font-size:13px;font-weight:700" id="kv4r">--%</span>
+          </div>
+          <div class="kpi-bar"><div class="kpi-fill" id="kb4" style="width:0%;background:#D0480A"></div></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- ① グラフ ＋ 右カラム（②③） -->
+    <div class="row-3-2">
+
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-badge">①</span>
+          <span class="card-title">月別売上推移と月次目標ライン（¥833,333 = 年間目標 ¥10M ÷ 12）　■濃紺=実績　■淡=Forecast</span>
+        </div>
+        <div class="card-body"><canvas id="revChart" height="215"></canvas></div>
+      </div>
+
+      <div class="col-stack">
+
+        <!-- ② パイプライン（月別＋工数） -->
+        <div class="card">
+          <div class="card-hdr" style="flex-wrap:wrap;gap:6px">
+            <span class="card-badge">②</span>
+            <span class="card-title">パイプライン — 案件別 月次売上 ＆ 工数入力</span>
+            <button type="button" onclick="togglePipeDetail()" id="pipe-detail-btn"
+              style="margin-left:auto;font-size:10px;padding:3px 10px;border-radius:4px;border:1px solid rgba(255,255,255,.4);background:rgba(255,255,255,.15);color:#fff;cursor:pointer;font-family:inherit">
+              月別詳細 ▼
+            </button>
+          </div>
+          <div class="card-body" style="padding:8px 10px">
+            <div id="pipe-summary-list"></div>
+            <div id="pipe-detail-panel" style="display:none;margin-top:8px;overflow-x:auto">
+              <table id="pipe-monthly-tbl" style="border-collapse:collapse;font-size:10px;min-width:100%"></table>
+            </div>
+            <div class="pipe-total-row" style="margin-top:8px">
+              <span class="pipe-total-lbl">パイプライン合計</span>
+              <span class="pipe-total-val" id="pipeTot">¥0</span>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ④ 案件工数 -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-badge">④</span>
+        <span class="card-title">案件別工数計画 vs チーム稼働可能時間　※月次更新時は工数入力欄を編集してください</span>
+        <span id="proj-month-badge" style="font-size:10px;color:rgba(255,255,255,.65);margin-left:8px;margin-right:4px"></span>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <button type="button" id="p4-btnPrev" class="btn-gantt-nav" onclick="switchKadou4('prev')" disabled>＜ 前月</button>
+          <button type="button" id="p4-btnCur"  class="btn-gantt-nav active" onclick="switchKadou4('current')">今月</button>
+          <button type="button" id="p4-btnNext" class="btn-gantt-nav" onclick="switchKadou4('next')" disabled>次月 ＞</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="proj-summary">
+          <div class="ps-item">
+            <div class="ps-val" style="color:#C0392B" id="ps-proj">--H</div>
+            <div class="ps-lbl">案件工数合計（必要）</div>
+          </div>
+          <div class="ps-item">
+            <div class="ps-val" style="color:#1C2D6B" id="ps-cap">--H</div>
+            <div class="ps-lbl">チーム稼働可能時間</div>
+          </div>
+          <div class="ps-item">
+            <div class="ps-val" id="ps-surplus">--H</div>
+            <div class="ps-lbl">余剰キャパシティ</div>
+          </div>
+          <div class="ps-item">
+            <div class="ps-rate" id="ps-rate" style="font-size:11px;margin-top:0">--</div>
+            <div class="ps-rate" id="ps-status" style="margin-top:6px">--</div>
+          </div>
+        </div>
+
+        <div class="proj-inputs">
+          <div class="proj-inp-group">
+            <div class="proj-inp-label">CAMELORS（H）</div>
+            <input class="proj-inp" data-proj="CAMELORS" type="number" min="0" value="40">
+          </div>
+          <div class="proj-inp-group">
+            <div class="proj-inp-label">HANOWA（H）</div>
+            <input class="proj-inp" data-proj="HANOWA" type="number" min="0" value="10">
+          </div>
+          <div class="proj-inp-group">
+            <div class="proj-inp-label">武田事務所（H）</div>
+            <input class="proj-inp" data-proj="武田" type="number" min="0" value="30">
+          </div>
+          <div class="proj-inp-group">
+            <div class="proj-inp-label">MAYA（H）</div>
+            <input class="proj-inp" data-proj="MAYA" type="number" min="0" value="100">
+          </div>
+          <div class="proj-inp-group">
+            <div class="proj-inp-label">ブリッジ（H）</div>
+            <input class="proj-inp" data-proj="ブリッジ" type="number" min="0" value="0">
+          </div>
+        </div>
+
+        <canvas id="projChart" height="100"></canvas>
+      </div>
+    </div>
+
+    <!-- ⑤ Gantt -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-badge">⑤</span>
+        <span class="card-title" id="ganttTitle">メンバー日別稼働可能時間（アサイン計画用ガントチャート）</span>
+        <span id="gantt-month-badge" style="font-size:10px;color:rgba(255,255,255,.65);margin-left:8px;margin-right:4px"></span>
+        <div style="margin-left:auto;display:flex;gap:6px;align-items:center;flex-shrink:0">
+          <button type="button" id="btnPrevMonth" class="btn-gantt-nav" onclick="switchKadou('prev')" disabled>＜ 前月</button>
+          <button type="button" id="btnCurMonth"  class="btn-gantt-nav active" onclick="switchKadou('current')">今月</button>
+          <button type="button" id="btnNextMonth" class="btn-gantt-nav" onclick="switchKadou('next')" disabled>次月 ＞</button>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="gantt-outer">
+          <table class="gantt" id="ganttTbl"><tr><td class="empty-msg" style="border:none">Excelを読み込んでください</td></tr></table>
+        </div>
+        <div class="gantt-legend">
+          <div class="leg"><div class="leg-sw" style="background:#1C2D6B"></div>7〜8H</div>
+          <div class="leg"><div class="leg-sw" style="background:#4A85C8"></div>4〜6H</div>
+          <div class="leg"><div class="leg-sw" style="background:#B5CEE8"></div>1〜3H</div>
+          <div class="leg"><div class="leg-sw" style="background:#F9FAFD;border:1px solid #D1D5DB"></div>0H</div>
+          <div class="leg"><div class="leg-sw" style="background:#E8EBF4;border:1px solid #CDD2E8"></div>土日</div>
+          <div class="leg"><div class="leg-sw" style="background:#FEF6E0;border:1px solid #F0D080"></div>祝日</div>
+          <span style="margin-left:12px;font-size:10px;color:var(--muted)">💡 日計が多い日ほど複数案件のアサインに余裕あり。誰に・いつ・どの案件を割り振るか確認用。</span>
+        </div>
+      </div>
+    </div>
+
+  </div>
+  </div><!-- /page-keiei -->
+
+  <!-- ══ PL 予実管理ページ ══════════════════════════════ -->
+  <div id="page-pl">
+  <div class="wrap">
+
+    <!-- Actual/Forecast 切替 -->
+    <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;background:var(--navy-pale);border-radius:6px;border:1px solid var(--border)">
+      <span style="font-size:11px;font-weight:600;color:var(--navy)">表示モード：</span>
+      <button type="button" id="pl-mode-actual" onclick="setPLMode('actual')"
+        style="font-size:11px;padding:5px 16px;border-radius:4px;border:2px solid var(--navy);background:var(--navy);color:#fff;font-weight:700;cursor:pointer;font-family:inherit">
+        📊 Actual（実績）
+      </button>
+      <button type="button" id="pl-mode-forecast" onclick="setPLMode('forecast')"
+        style="font-size:11px;padding:5px 16px;border-radius:4px;border:2px solid var(--border);background:var(--white);color:var(--muted);font-weight:600;cursor:pointer;font-family:inherit">
+        🔮 Forecast（予測）
+      </button>
+      <span id="pl-mode-note" style="font-size:10px;color:var(--muted);margin-left:4px">
+        ④ドリルスルーは Actual モードのみ使用可
+      </span>
+    </div>
+
+    <!-- KPI 6枚: PL3枚 ＋ Runway3枚 同一行 -->
+    <div style="display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:10px">
+      <!-- ① PL KPIs -->
+      <div class="kpi" style="--kc:#1C2D6B">
+        <div class="kpi-lbl">売上高</div>
+        <div class="kpi-val" id="plk-rev" style="font-size:17px">--</div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted)">
+          <span>予算 <span id="plk-rev-bud" style="color:var(--navy);font-weight:600">--</span></span>
+          <span>予算比 <span id="plk-rev-rate" style="font-weight:700">--</span></span>
+        </div>
+        <div class="kpi-bar"><div class="kpi-fill" id="plk-rev-bar" style="width:0%"></div></div>
+      </div>
+      <div class="kpi" style="--kc:#1E7D4A">
+        <div class="kpi-lbl">売上総利益</div>
+        <div class="kpi-val" id="plk-gp" style="font-size:17px">--</div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted)">
+          <span>予算 <span id="plk-gp-bud" style="color:var(--green);font-weight:600">--</span></span>
+          <span>予算比 <span id="plk-gp-rate" style="font-weight:700">--</span></span>
+        </div>
+        <div class="kpi-bar"><div class="kpi-fill" id="plk-gp-bar" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div class="kpi" style="--kc:#F0A000">
+        <div class="kpi-lbl">営業利益</div>
+        <div class="kpi-val" id="plk-op" style="font-size:17px">--</div>
+        <div style="display:flex;justify-content:space-between;margin-top:4px;font-size:10px;color:var(--muted)">
+          <span>予算 <span id="plk-op-bud" style="color:var(--orange);font-weight:600">--</span></span>
+          <span>予算比 <span id="plk-op-rate" style="font-weight:700">--</span></span>
+        </div>
+        <div class="kpi-bar"><div class="kpi-fill" id="plk-op-bar" style="width:0%;background:var(--orange)"></div></div>
+      </div>
+      <!-- ② Runway KPIs -->
+      <div class="kpi" style="--kc:#1C2D6B">
+        <div class="kpi-lbl">現預金残高</div>
+        <div class="kpi-val" id="pl2-cash" style="font-size:17px">--</div>
+        <div class="kpi-note" id="pl2-cash-note">選択月末時点</div>
+      </div>
+      <div class="kpi" style="--kc:#C0392B">
+        <div class="kpi-lbl">ネットバーン（月次）</div>
+        <div class="kpi-val" id="pl2-burn" style="font-size:17px">--</div>
+        <div class="kpi-note">現預金減少額（正=バーン）</div>
+      </div>
+      <div class="kpi" style="--kc:#F0A000">
+        <div class="kpi-lbl">ランウェイ</div>
+        <div class="kpi-val" id="pl2-runway" style="font-size:17px">--</div>
+        <div class="kpi-note">現預金 ÷ 直近3ヶ月平均バーン</div>
+      </div>
+    </div>
+
+    <!-- ① PL表 ＋ ② Runwayチャート（等幅2列）-->
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+
+      <!-- ① PL P/L形式サマリー -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-badge">①</span>
+          <span class="card-title">P/L サマリー（選択期間）</span>
+          <span id="pl-selected-month-badge" style="margin-left:8px;font-size:11px;background:var(--orange);color:var(--navy);padding:2px 8px;border-radius:3px;font-weight:700"></span>
+        </div>
+        <!-- 期間・月 選択バー -->
+        <div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center;padding:9px 14px 8px;border-bottom:1px solid var(--border);background:var(--navy-pale);">
+          <span style="font-size:10px;color:var(--muted);margin-right:2px;white-space:nowrap;">期間：</span>
+          <button type="button" class="pl-period-btn" data-period="1Q"  onclick="selectPLPeriod('1Q')">1Q</button>
+          <button type="button" class="pl-period-btn" data-period="2Q"  onclick="selectPLPeriod('2Q')">2Q</button>
+          <button type="button" class="pl-period-btn" data-period="3Q"  onclick="selectPLPeriod('3Q')">3Q</button>
+          <button type="button" class="pl-period-btn" data-period="4Q"  onclick="selectPLPeriod('4Q')">4Q</button>
+          <button type="button" class="pl-period-btn" data-period="上期" onclick="selectPLPeriod('上期')">上期</button>
+          <button type="button" class="pl-period-btn" data-period="下期" onclick="selectPLPeriod('下期')">下期</button>
+          <button type="button" class="pl-period-btn" data-period="通期" onclick="selectPLPeriod('通期')">通期</button>
+          <span style="width:1px;height:16px;background:var(--border);display:inline-block;vertical-align:middle;margin:0 4px;flex-shrink:0;"></span>
+          <span style="font-size:10px;color:var(--muted);margin-right:2px;white-space:nowrap;">月：</span>
+          <div id="pl-month-btns" style="display:flex;flex-wrap:wrap;gap:4px;"></div>
+        </div>
+        <div class="card-body" style="padding:0">
+          <div id="pl1-tbl"></div>
+        </div>
+      </div>
+
+      <!-- ② Runway チャート -->
+      <div class="card">
+        <div class="card-hdr">
+          <span class="card-badge">②</span>
+          <span class="card-title">現預金残高 ＆ 月次キャッシュ増減推移　<span style="font-size:10px;font-weight:400;opacity:.8">棒グラフ：緑=増加 赤=減少（バーン）</span></span>
+        </div>
+        <div class="card-body"><canvas id="pl2-chart" height="260"></canvas></div>
+      </div>
+    </div>
+
+    <!-- ③ 月次P/L横並び（現預金含む） -->
+    <div class="card">
+      <div class="card-hdr">
+        <span class="card-badge">③</span>
+        <span class="card-title">月次P/L推移 ＋ 現預金（セルクリック→④ドリルスルー）　<span style="font-size:10px;font-weight:400;opacity:.8">■ 実績あり月　□ 予測月</span></span>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div style="overflow-x:auto" id="pl3-outer">
+          <div id="pl3-tbl"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ④ ドリルスルー -->
+    <div class="card" id="pl4-card" style="display:none">
+      <div class="card-hdr" style="justify-content:space-between">
+        <div style="display:flex;align-items:center;gap:8px">
+          <span class="card-badge">④</span>
+          <span class="card-title" id="pl4-title">ドリルスルー</span>
+        </div>
+        <button type="button" onclick="closeDrill()" style="background:rgba(255,255,255,.2);border:none;color:#fff;padding:3px 10px;border-radius:4px;cursor:pointer;font-size:11px">✕ 閉じる</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div style="overflow-x:auto">
+          <table id="pl4-tbl" style="border-collapse:collapse;width:100%;font-size:11px">
+            <thead id="pl4-thead"></thead>
+            <tbody id="pl4-tbody"></tbody>
+          </table>
+        </div>
+        <div id="pl4-empty" style="display:none" class="empty-msg">該当する仕訳データがありません</div>
+      </div>
+    </div>
+
+  </div>
+</div><!-- /page-pl -->
+
+</div><!-- /dashboard -->
+
+<!-- Hidden file input for drag & drop anywhere on page -->
+
+<script>
+/* ═════════════════════════════════════════════════════════
+   定数・状態管理
+═════════════════════════════════════════════════════════ */
+const TGT    = 10000000;
+const LS_KEY = 'fn_dashboard_v18';  // v12: cashFC対応・上下期追加  // v9: キャッシュリセット  // バージョン変更でキャッシュ自動リセット
+const F      = v => '¥' + Math.abs(Math.round(v)).toLocaleString('ja-JP');
+const Pct    = (v,t) => Math.min(100, Math.max(0, v / t * 100));
+const MONTHS = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+
+const PIPE_COLORS = ['#1C2D6B','#4A85C8','#F0A000','#D0480A','#1E7D4A'];
+const PROJ_CONFIG = [
+  {key:'CAMELORS', color:'#1C2D6B'},
+  {key:'HANOWA',   color:'#4A85C8'},
+  {key:'武田',      color:'#F0A000'},
+  {key:'MAYA',     color:'#D0480A'},
+  {key:'ブリッジ',   color:'#1E7D4A'},
+];
+
+const charts = {};
+let S = {
+  pl:null, pipeline:null, kadou:null,
+  kadouData:{current:null,prev:null,next:null}, kadouMode:'current', kadouMode4:'current',
+  holidays:[], projHours:null, lastUpdated:null,
+  /* PL予実管理 */
+  plActual:null, plBudget:null, plBudgetManual:{}, plBudgetMode:'file',
+  plActualOverrides:{}, plBudgetOverrides:{},
+  plActualSheet:null, plBudgetSheet:null,
+  yojitsu:null, bsData:null, glData:null, plSelMonth:null, plSelPeriod:null, pl3Expand:false,
+  plMode:'actual',
+};
+
+/* ═════════════════════════════════════════════════════════
+   LocalStorage
+═════════════════════════════════════════════════════════ */
+function saveLS() {
+  try { localStorage.setItem(LS_KEY, JSON.stringify(S)); } catch(e) {}
+}
+function loadLS() {
+  try {
+    const d = JSON.parse(localStorage.getItem(LS_KEY));
+    if (d) { S = {...S, ...d}; return true; }
+  } catch(e) {}
+  return false;
+}
+
+/* ═════════════════════════════════════════════════════════
+   Excel パーサー
+═════════════════════════════════════════════════════════ */
+function parsePL(sheet) {
+  /* ① まずfreeeパーサーで試行（freee形式 & 今後のExcel両対応） */
+  const fd = parseFreee(sheet);
+  if (fd?.summary?.['売上高']) {
+    const months = fd.months || [1,2,3,4,5,6,7,8,9,10,11,12];
+    /* 月番号(1-12)インデックスの配列に変換 */
+    const toArr = vals => {
+      const arr = Array(12).fill(0);
+      months.forEach((m,i) => { if (m>=1&&m<=12) arr[m-1] = vals?.[i]||0; });
+      return arr;
+    };
+    const revenue = toArr(fd.summary['売上高']);
+    const sga     = toArr(fd.summary['販管費']);
+    /* クライアント別売上 */
+    const clientRevenue = {};
+    (fd.allItems||[]).forEach(item => {
+      for (const {key} of PROJ_CONFIG) {
+        if (item.name.includes(key) && !clientRevenue[item.name]) {
+          clientRevenue[item.name] = toArr(item.vals);
+          break;
+        }
+      }
+    });
+    return {
+      months: [1,2,3,4,5,6,7,8,9,10,11,12],
+      revenue, clientRevenue, sga,
+      annualRevenue: revenue.reduce((s,v)=>s+v,0),
+    };
+  }
+
+  /* ② フォールバック：旧形式（B列=ラベル, C-N列=データ） */
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  const DATA_COLS  = [1,2,3,4,5,6,7,8,9,10,11,12];
+  const ANNUAL_COL = 13;
+  const num = v => (typeof v === 'number' ? v : 0);
+  const getVals = row => DATA_COLS.map(c => num(row[c]));
+  const res = {
+    months: [1,2,3,4,5,6,7,8,9,10,11,12],
+    revenue: Array(12).fill(0), clientRevenue: {},
+    sga: Array(12).fill(0), annualRevenue: 0,
+  };
+  for (const row of rows) {
+    /* B列(idx0)またはC列(idx1)どちらにラベルがあっても対応 */
+    const lblRaw = (row[0] != null && typeof row[0]==='string' && row[0].trim())
+                    ? row[0] : row[1];
+    if (lblRaw == null) continue;
+    const lbl = lblRaw.toString().replace(/^[\s\u3000]+/, '').trim();
+    /* ラベル列が idx1 の場合、データは idx2〜13, annual=idx14 */
+    const shift = (lblRaw === row[1] && row[0] == null) ? 1 : 0;
+    const getValsS = r => [1,2,3,4,5,6,7,8,9,10,11,12].map(c => num(r[c+shift]));
+    const annualS  = 13 + shift;
+
+    if (lbl === '売上高 計') {
+      res.revenue = getValsS(row);
+      res.annualRevenue = num(row[annualS]) || res.revenue.reduce((s,v)=>s+v, 0);
+    }
+    if (lbl === '販売管理費 計') res.sga = getValsS(row);
+    for (const {key} of PROJ_CONFIG) {
+      if (lbl.includes(key)) { res.clientRevenue[lbl] = getValsS(row); break; }
+    }
+  }
+  return res;
+}
+/* ═════════════════════════════════════════════════════
+   Google Sheets IMPORTRANGE → Excel 変換セル値正規化
+   =IFERROR(__xludf.DUMMYFUNCTION("..."),VALUE) 形式から
+   IFERRORの第2引数（実際のキャッシュ値）を取り出す
+═════════════════════════════════════════════════════ */
+function extractCellVal(v) {
+  if (typeof v !== 'string' || !v.startsWith('=IFERROR(')) return v;
+  const m = v.match(/,\s*("((?:[^"\\]|"")*)"|(-?\d[\d.]*(?:[eE][+\-]?\d+)?))\s*\)\s*$/);
+  if (!m) return v;
+  if (m[3] !== undefined) { const n = parseFloat(m[3]); return isNaN(n) ? v : n; }
+  if (m[2] !== undefined) return m[2].replace(/""/g, '"');
+  return v;
+}
+function normRows(sheet, opts) {
+  const raw = XLSX.utils.sheet_to_json(
+    sheet, Object.assign({header:1, raw:true, defval:null}, opts||{}));
+  return raw.map(r => r.map(extractCellVal));
+}
+
+function parsePipeline(sheet) {
+  if (!sheet) return { clients:[], total:0 };
+  const rows = normRows(sheet);
+  const SKIP = ['合計','入力','ロジック','案件金額','パイプライン'];
+  const clients = [];
+
+  for (const row of rows) {
+    /* A列があればrow[1]が名前、なければrow[0]が名前 — 両方試す */
+    let nameCol = -1, amtCol = -1, logCol = -1;
+    for (let i = 0; i < row.length; i++) {
+      if (typeof row[i] === 'string' && row[i].trim().length > 1 && nameCol < 0) nameCol = i;
+      else if (typeof row[i] === 'number' && row[i] > 0 && nameCol >= 0 && amtCol < 0) { amtCol = i; logCol = i + 1; }
+    }
+    if (nameCol < 0 || amtCol < 0) continue;
+    const name = row[nameCol].toString().trim();
+    if (!name || SKIP.some(s => name.includes(s))) continue;
+    clients.push({ name, amount: row[amtCol], logic: (row[logCol]||'').toString().trim() });
+  }
+  return { clients, total: clients.reduce((s,c)=>s+c.amount,0) };
+}
+
+function parseKadou(sheet) {
+  if (!sheet) return null;
+  /* normRowsでIMPORTRANGE形式の数式文字列を実際の値に変換してから処理する */
+  const rows = normRows(sheet);
+  let year=null, month=null;
+  const members = [];
+  let NO_OFFSET = null;
+
+  /* ── Pass 1: NO_OFFSETをプリスキャンで確定 ─────────────────────
+     「数値+文字列」パターンでの行中探索は誤検出しやすいため、
+     ヘッダー行（"No"→"氏名"の並び）を探すことで確実に特定する。
+     フォールバックとして "No" ラベルがない旧形式には
+     No=1の行かつ隣が4文字以内の人名らしい文字列の場合のみ許容する。 */
+  for (const r of rows) {
+    if (NO_OFFSET !== null) break;
+    for (let ci = 0; ci <= 3; ci++) {
+      if (r[ci] === 'No' && r[ci+1] === '氏名') { NO_OFFSET = ci; break; }
+    }
+  }
+  if (NO_OFFSET === null) { /* フォールバック: No=1 の行を探す */
+    for (const r of rows) {
+      if (NO_OFFSET !== null) break;
+      for (let ci = 0; ci <= 2; ci++) {
+        if (r[ci] === 1 && typeof r[ci+1] === 'string' &&
+            r[ci+1].trim().length >= 1 && r[ci+1].trim().length <= 4 &&
+            !['No','氏名','役割','曜日'].includes(r[ci+1].trim())) {
+          NO_OFFSET = ci; break;
+        }
+      }
+    }
+  }
+
+  /* ── Pass 2: 年月検出 ＋ メンバー解析 ───────────────────────── */
+  for (const row of rows) {
+    /* 年月検出 (indexOf は offset 不問) */
+    if (!year) {
+      /* パターン①: "対象年" / "対象月" ラベル方式 */
+      const yi = row.indexOf('対象年');
+      if (yi >= 0) {
+        const rawYear = row[yi+1];
+        year = typeof rawYear==='number' ? rawYear : parseInt(rawYear);
+        const mi = row.indexOf('対象月');
+        if (mi >= 0) {
+          const rawMonth = row[mi+1];
+          month = typeof rawMonth==='number' ? rawMonth : parseInt(rawMonth);
+        }
+      }
+      /* パターン②: "YYYY年M月" 形式のセルから抽出 */
+      if (!year) {
+        for (const cell of row) {
+          if (typeof cell !== 'string') continue;
+          const m2 = cell.match(/(\d{4})年\s*(\d{1,2})月/);
+          if (m2) { year = parseInt(m2[1]); month = parseInt(m2[2]); break; }
+        }
+      }
+      /* パターン③: 行内に 2024〜2030 の整数 + 1〜12 の整数が隣接 */
+      if (!year) {
+        for (let ci = 0; ci < row.length - 1; ci++) {
+          const v = row[ci];
+          if (typeof v === 'number' && v >= 2024 && v <= 2030 && Number.isInteger(v)) {
+            const vn = row[ci+1];
+            if (typeof vn === 'number' && vn >= 1 && vn <= 12 && Number.isInteger(vn)) {
+              year = v; month = vn; break;
+            }
+          }
+        }
+      }
+    }
+
+    if (NO_OFFSET === null) continue;
+
+    const no    = row[NO_OFFSET];
+    const name  = row[NO_OFFSET + 1];
+    /* totalH は No+3 (旧:idx4=E) or No+4 (新:idx5=F) — 数値の列を探す */
+    let totalH = null;
+    for (let delta = 3; delta <= 5; delta++) {
+      const v = row[NO_OFFSET + delta];
+      if (typeof v==='number' && v > 0) { totalH = v; break; }
+    }
+    /* Day1は No+7 (旧/新共通: No,氏名,役割,稼働区分,予定h,稼働率,備考 の7列の後) */
+    const DAY_START = NO_OFFSET + 7;
+
+    if (typeof no==='number' && no>=1 && no<=20 &&
+        typeof name==='string' && name.trim() &&
+        totalH !== null) {
+      const dailyH = [];
+      for (let d=0; d<31; d++) dailyH.push(row[DAY_START+d]||0);
+      members.push({ name:name.trim(), totalH, dailyH });
+    }
+  }
+  return { year, month, members, totalH: members.reduce((s,m)=>s+m.totalH,0) };
+}
+
+function parseHolidays(sheet) {
+  if (!sheet) return [];
+  const rows = normRows(sheet);
+  const isSerial = v => typeof v==='number' && v>44000 && v<50000;
+  return rows
+    .map(r => { const v = r.find(isSerial); return v ? new Date((v-25569)*86400*1000) : null; })
+    .filter(Boolean);
+}
+
+function processFile(buf) {
+  try {
+    const wb = XLSX.read(buf, {type:'array'});
+    const safeparse = (fn, sheet, fallback=null) => { try { return fn(sheet); } catch(e) { console.error('parser error:', e); return fallback; } };
+
+    if (!wb.Sheets['PL']) { alert('PLシートが見つかりません。ファイルを確認してください。'); return; }
+    /* シート名を柔軟に検索するヘルパー */
+    const findSheet = (...keys) => {
+      for (const k of keys) {
+        if (wb.Sheets[k]) return wb.Sheets[k];
+      }
+      /* 部分一致フォールバック: keys[0] の先頭語が含まれるシートを探す */
+      const hint = keys[0].replace(/[_前月今次]/g,'').slice(0,3);
+      const found = wb.SheetNames.find(n => n.includes(hint));
+      return found ? wb.Sheets[found] : undefined;
+    };
+
+    S.pl       = safeparse(parsePL, wb.Sheets['PL']);
+    S.pipeline = safeparse(parsePipeline, wb.Sheets['パイプライン']);
+    S.kadouData = {
+      current: safeparse(parseKadou, findSheet('稼働管理','今月_稼働管理','稼働')),
+      prev:    safeparse(parseKadou, findSheet('前月_稼働管理','前月稼働管理')),
+      next:    safeparse(parseKadou, findSheet('次月_稼働管理','次月稼働管理')),
+    };
+    S.kadouMode = 'current';
+    S.kadou    = S.kadouData.current;
+    S.holidays = safeparse(parseHolidays, wb.Sheets['祝日マスタ'], []);
+
+    /* ガントバッジに読み込んだシート名を反映（デバッグ用） */
+    const sheetLoaded = S.kadou?.members?.length
+      ? `メンバー${S.kadou.members.length}名 読込済`
+      : '稼働シート未検出';
+
+    /* 予実管理 / BS推移 / 総勘定元帳 */
+    /* 新形式（実績・予算シート分離）を優先、旧予実管理シートはフォールバック */
+    if (wb.Sheets['実績'] || wb.Sheets['予算']) {
+      try { S.yojitsu = parseYojitsuSplit(wb.Sheets['実績'], wb.Sheets['予算']); }
+      catch(e) { S.yojitsu = null; console.error('parseYojitsuSplit error:', e); }
+    } else {
+      S.yojitsu = safeparse(parseYojitsu, wb.Sheets['予実管理']);
+    }
+    S.bsData  = safeparse(parseBS, wb.Sheets['BS推移']);
+    S.glData  = safeparse(parseGL, wb.Sheets['総勘定元帳']);
+    S.plSelMonth = null; /* 選択月リセット */
+    S.lastUpdated = new Date().toLocaleString('ja-JP',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+
+    saveLS();
+    showDash();                          // ← 先にDOMを表示してからChartを描く
+    setTimeout(() => {
+      renderAll();
+      renderPLDetail();
+    }, 0);   // ← ブラウザのreflow後にChart.jsが幅を取得できる
+  } catch(e) {
+    alert('読み込みエラー: ' + e.message);
+    console.error(e);
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   描画
+═════════════════════════════════════════════════════════ */
+function renderAll() {
+  /* kadouDataがある場合はモードに合わせてkadouを同期 */
+  if (S.kadouData) {
+    S.kadou = S.kadouData[S.kadouMode || 'current'] || S.kadouData.current || S.kadou;
+  }
+  if (S.pl) {
+    renderKPIs();
+    renderRevChart();
+    renderPipelineInputs();
+    renderPipeSummary();
+    refreshProjHours();
+    renderGantt();
+    updateProjNav();
+    updateGanttNav();
+    onPipeChange();
+    document.getElementById('lastUpdated').textContent = `最終更新：${S.lastUpdated||'--'}`;
+  }
+  renderPLIfNeeded();
+  renderPLDetail();
+}
+
+/* ① KPI */
+function renderKPIs() {
+  const conf    = S.pl ? S.pl.annualRevenue : 0;
+  const pipe    = getPipeTotal();
+  const total   = conf + pipe;
+  const gap     = TGT - conf;          // 確定売上 vs 目標
+  const gapPipe = TGT - total;         // 確定+パイプ vs 目標
+  const rate    = Pct(conf, TGT);      // 確定ベース達成率
+  const rateP   = Pct(total, TGT);     // パイプ込み達成率
+
+  const set = (id, val) => { const e=document.getElementById(id); if(e) e.textContent=val; };
+  const setC = (id, col) => { const e=document.getElementById(id); if(e) e.style.color=col; };
+  const setW = (id, pct) => { const e=document.getElementById(id); if(e) e.style.width=pct+'%'; };
+
+  /* 左ブロック：確定売上 */
+  set('kv1', F(conf));
+  setW('kb1', rate);
+  set('kv2', (gap>0?'▲ ':'+') + F(Math.abs(gap)));
+  setC('kv2', gap>0?'#C0392B':'#1E7D4A');
+  set('kn2', gap>0?'目標未達':'目標超過');
+  set('kv2r', rate.toFixed(1)+'%');
+  setW('kb2', Math.min(100, rate));
+
+  /* 右ブロック：確定＋パイプライン */
+  set('kv5', F(total));
+  set('kn5', pipe>0 ? `パイプライン +¥${Math.round(pipe/10000)}万含む` : 'パイプライン未入力');
+  setW('kb5', rateP);
+  set('kv4', (gapPipe>0?'▲ ':'+') + F(Math.abs(gapPipe)));
+  setC('kv4', gapPipe>0?'#D0480A':'#1E7D4A');
+  set('kn4', gapPipe>0?'目標未達':'目標超過');
+  set('kv4r', rateP.toFixed(1)+'%');
+  setW('kb4', Math.min(100, rateP));
+}
+
+/* ① Revenue Chart */
+function renderRevChart() {
+  if (charts.rev) { charts.rev.destroy(); charts.rev=null; }
+  const { pl, kadou } = S;
+  const actMonth = kadou ? kadou.month : 5;
+  const rev = pl.revenue;
+  const labels = pl.months.map(m => MONTHS[m-1]);
+  const cum = rev.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+
+  charts.rev = new Chart(document.getElementById('revChart'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'売上（実績/Forecast）', data:rev, order:3,
+          backgroundColor: rev.map((_,i)=> pl.months[i]<actMonth ? '#1C2D6B' : '#B5C0DA'),
+          borderWidth:0, borderRadius:3 },
+        { type:'line', label:`月次目標（¥${Math.round(TGT/pl.months.length).toLocaleString()}）`,
+          data: Array(pl.months.length).fill(Math.round(TGT/pl.months.length)),
+          borderColor:'#C0392B', borderWidth:1.5, borderDash:[6,4], pointRadius:0, fill:false, order:2 },
+        { type:'line', label:'確定売上累計',
+          data: cum, borderColor:'#F0A000', borderWidth:2.5,
+          pointRadius:3, pointBackgroundColor:'#F0A000', fill:false, order:1 },
+        (() => {
+          /* パイプライン加味後累計 */
+          const pipeM = getPipeMonthlyTotal();
+          const withPipe = rev.map((v,i) => v + (pipeM[i]||0));
+          const cumPipe = withPipe.reduce((a,v,i)=>{ a.push((a[i-1]||0)+v); return a; },[]);
+          return {
+            type:'line', label:'パイプライン込み累計',
+            data: cumPipe,
+            borderColor:'#1E7D4A', borderWidth:2,
+            borderDash:[8,4],
+            pointRadius:2.5, pointBackgroundColor:'#1E7D4A',
+            fill:false, order:0
+          };
+        })()
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      interaction:{ mode:'index' },
+      plugins: {
+        legend:{ labels:{ boxWidth:12, padding:12 } },
+        tooltip:{ callbacks:{ label: c => c.dataset.label+': ¥'+c.raw.toLocaleString('ja-JP') } }
+      },
+      scales: {
+        x:{ grid:{ color:'#E8EBF4' } },
+        y:{ grid:{ color:'#E8EBF4' }, beginAtZero:true,
+            ticks:{ callback: v => '¥'+(v/10000).toFixed(0)+'万' } }
+      }
+    }
+  });
+}
+
+/* ② Pipeline inputs (Excelから自動入力) */
+function renderPipelineInputs() {
+  if (!S.pipeline?.clients) return;
+  const inps = document.querySelectorAll('.pipe-inp');
+  const logics = [
+    document.getElementById('logic-0'), document.getElementById('logic-1'),
+    document.getElementById('logic-2'), document.getElementById('logic-3'),
+    document.getElementById('logic-4'),
+  ];
+  PROJ_CONFIG.forEach(({key}, idx) => {
+    const match = S.pipeline.clients.find(c => c.name.includes(key));
+    if (match) {
+      inps[idx].value = match.amount > 0 ? match.amount.toLocaleString('ja-JP') : '';
+      if (logics[idx]) logics[idx].textContent = match.logic || '';
+    }
+  });
+}
+
+/* ② Pipeline change → ③ gap */
+function fmtInput(el) {
+  const raw = el.value.replace(/,/g, '');
+  const n = parseInt(raw, 10);
+  if (!isNaN(n) && n > 0) {
+    el.value = n.toLocaleString('ja-JP');
+  } else if (raw === '' || raw === '0') {
+    el.value = '';
+  }
+}
+function parseInput(el) {
+  return parseInt(el.value.replace(/,/g, ''), 10) || 0;
+}
+/* ── パイプライン管理 ──────────────────────────────────── */
+
+/* PIPE_CLIENTS: 案件定義 */
+const PIPE_CLIENTS = [
+  { key:'CAMELORS', name:'CAMELORS株式会社',          color:'#1C2D6B' },
+  { key:'HANOWA',   name:'株式会社HANOWA',             color:'#4A85C8' },
+  { key:'武田',      name:'武田優一郎公認会計士事務所', color:'#F0A000' },
+  { key:'MAYA',     name:'MAYA',                       color:'#D0480A' },
+  { key:'ブリッジ',  name:'ブリッジコンサルティンググループ', color:'#1E7D4A' },
+];
+
+/* S.pipeData: { key → { months:[12], hours:[12] } } */
+if (!S.pipeData) S.pipeData = {};
+
+function initPipeData() {
+  PIPE_CLIENTS.forEach(c => {
+    if (!S.pipeData[c.key]) S.pipeData[c.key] = { months:Array(12).fill(0), hours:Array(12).fill(0) };
+  });
+}
+
+function getPipeTotal() {
+  let t = 0;
+  PIPE_CLIENTS.forEach(c => {
+    const d = S.pipeData[c.key];
+    if (d) t += d.months.reduce((s,v)=>s+v,0);
+  });
+  return t;
+}
+
+function getPipeMonthlyTotal() {
+  /* 月別パイプライン合計 [12] */
+  const arr = Array(12).fill(0);
+  PIPE_CLIENTS.forEach(c => {
+    const d = S.pipeData[c.key];
+    if (d) d.months.forEach((v,i)=>{ arr[i]+=v; });
+  });
+  return arr;
+}
+
+function getPipeHoursTotal() {
+  /* 月別工数合計 { key → [12] } + 全体 [12] */
+  const total = Array(12).fill(0);
+  const byClient = {};
+  PIPE_CLIENTS.forEach(c => {
+    const d = S.pipeData[c.key];
+    byClient[c.key] = d ? [...d.hours] : Array(12).fill(0);
+    if (d) d.hours.forEach((v,i)=>{ total[i]+=v; });
+  });
+  return { total, byClient };
+}
+
+function onPipeChange() {
+  saveLS();
+  /* KPI更新 */
+  renderKPIs();
+  /* チャート更新 */
+  renderRevChart();
+  /* pipeTot更新 */
+  const tot = getPipeTotal();
+  const el = document.getElementById('pipeTot');
+  if (el) el.textContent = F(tot);
+  /* ④工数連動 */
+  syncPipeToProj();
+  /* PLページが表示中なら予実サマリーも更新（パイプライン→売上Forecast連動） */
+  const plPage = document.getElementById('page-pl');
+  if (plPage && plPage.style.display !== 'none') {
+    renderPL1();
+    renderPLKPIBoxes();
+  }
+}
+
+function togglePipeDetail() {
+  const panel = document.getElementById('pipe-detail-panel');
+  const btn   = document.getElementById('pipe-detail-btn');
+  if (!panel) return;
+  const open = panel.style.display === 'none';
+  panel.style.display = open ? 'block' : 'none';
+  if (btn) btn.textContent = open ? '月別詳細 ▲' : '月別詳細 ▼';
+  /* ① パイプラインテーブル展開/折りたたみ時に、
+     右カラムの高さ変化でグラフcanvasの幅が変わるため resize で再描画 */
+  requestAnimationFrame(() => {
+    if (charts.rev) charts.rev.resize();
+  });
+}
+
+/* パイプライン入力UIを構築 */
+function renderPipeSummary() {
+  initPipeData();
+  const list = document.getElementById('pipe-summary-list');
+  if (!list) return;
+
+  list.innerHTML = PIPE_CLIENTS.map(c => {
+    const d   = S.pipeData[c.key];
+    const tot = d ? d.months.reduce((s,v)=>s+v,0) : 0;
+    const hTot= d ? d.hours.reduce((s,v)=>s+v,0) : 0;
+    return `<div class="pipe-sum-row">
+      <span class="pipe-sum-dot" style="background:${c.color}"></span>
+      <span class="pipe-sum-name">${c.name}</span>
+      <span class="pipe-sum-h" style="color:var(--muted)">${hTot>0?hTot+'H':'-'}</span>
+      <span class="pipe-sum-total">${tot>0?F(tot):'¥0'}</span>
+    </div>`;
+  }).join('');
+
+  /* 月別テーブル */
+  const tbl = document.getElementById('pipe-monthly-tbl');
+  if (!tbl) return;
+
+  const mnths = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+  let html = `<tr class="pmtbl-hdr">
+    <th>案件</th>
+    ${mnths.map(m=>`<th>${m}</th>`).join('')}
+    <th class="pmtbl-h">工数計(H)</th>
+  </tr>`;
+
+  PIPE_CLIENTS.forEach(c => {
+    const d = S.pipeData[c.key] || {months:Array(12).fill(0), hours:Array(12).fill(0)};
+    const hTot = d.hours.reduce((s,v)=>s+v,0);
+    /* 売上行 */
+    html += `<tr>
+      <td style="color:${c.color}">${c.name.length>10?c.name.slice(0,10)+'…':c.name}（¥）</td>
+      ${d.months.map((v,mi)=>`<td><input class="pm-inp" data-key="${c.key}" data-mi="${mi}" data-type="amt"
+        value="${v>0?v.toLocaleString('ja-JP'):''}" placeholder="0"
+        onchange="onPmInpChange(this)" onfocus="this.value=this.value.replace(/,/g,'')" onblur="fmtPmInp(this)"></td>`).join('')}
+      <td class="pmtbl-h" style="font-size:10px;color:var(--muted)" id="pipe-h-tot-${c.key}">${hTot>0?hTot+'H':'-'}</td>
+    </tr>`;
+    /* 工数行 */
+    html += `<tr>
+      <td style="color:var(--muted);font-size:9px;padding-left:12px">　工数（H）</td>
+      ${d.hours.map((v,mi)=>`<td><input class="pm-inp" data-key="${c.key}" data-mi="${mi}" data-type="h"
+        value="${v>0?v:''}" placeholder="0" type="number" min="0"
+        onchange="onPmInpChange(this)"></td>`).join('')}
+      <td></td>
+    </tr>`;
+  });
+
+  /* 合計行 */
+  const mTot = getPipeMonthlyTotal();
+  const hTotAll = getPipeHoursTotal().total;
+  html += `<tr class="pmtbl-total">
+    <td>月別合計（¥）</td>
+    ${mTot.map(v=>`<td>${v>0?Math.round(v).toLocaleString('ja-JP'):'-'}</td>`).join('')}
+    <td></td>
+  </tr>`;
+  html += `<tr class="pmtbl-total">
+    <td style="color:var(--muted);font-size:9px">工数合計（H）</td>
+    ${hTotAll.map(v=>`<td style="color:var(--muted)">${v>0?v:'-'}</td>`).join('')}
+    <td></td>
+  </tr>`;
+
+  tbl.className = 'pmtbl';
+  tbl.innerHTML = html;
+
+  /* pipeTot */
+  const el = document.getElementById('pipeTot');
+  if (el) el.textContent = F(getPipeTotal());
+}
+
+function fmtPmInp(el) {
+  const n = parseInt(el.value.replace(/,/g,''), 10);
+  el.value = (!isNaN(n) && n > 0) ? n.toLocaleString('ja-JP') : '';
+}
+
+function onPmInpChange(el) {
+  const key = el.dataset.key, mi = +el.dataset.mi, type = el.dataset.type;
+  if (!S.pipeData[key]) S.pipeData[key] = {months:Array(12).fill(0), hours:Array(12).fill(0)};
+  const v = parseInt((el.value||'').replace(/,/g,''), 10) || 0;
+  if (type === 'amt') {
+    S.pipeData[key].months[mi] = v;
+    /* サマリー更新 */
+    const summaryEl = document.querySelector(`.pipe-sum-row:nth-child(${PIPE_CLIENTS.findIndex(c=>c.key===key)+1}) .pipe-sum-total`);
+    if (summaryEl) summaryEl.textContent = F(S.pipeData[key].months.reduce((s,v)=>s+v,0));
+    /* 合計行更新 */
+    renderPipeTotRow();
+  } else {
+    S.pipeData[key].hours[mi] = v;
+    const hTotEl = document.getElementById(`pipe-h-tot-${key}`);
+    if (hTotEl) hTotEl.textContent = S.pipeData[key].hours.reduce((s,v)=>s+v,0)+'H';
+  }
+  onPipeChange();
+}
+
+function renderPipeTotRow() {
+  const mTot = getPipeMonthlyTotal();
+  const rows = document.querySelectorAll('#pipe-monthly-tbl tr.pmtbl-total');
+  if (rows[0]) {
+    const tds = rows[0].querySelectorAll('td');
+    mTot.forEach((v,i) => { if(tds[i+1]) tds[i+1].textContent = v>0?Math.round(v).toLocaleString('ja-JP'):'-'; });
+  }
+  const el = document.getElementById('pipeTot');
+  if (el) el.textContent = F(getPipeTotal());
+}
+
+/* ④工数欄へのパイプライン工数同期 */
+function syncPipeToProj() {
+  /* 当月(currentモード)の工数を合算してproj-inpに反映 */
+  const kadouMode = S.kadouMode4 || 'current';
+  const mIdx = (() => {
+    const kd = S.kadouData?.[kadouMode];
+    return kd ? kd.month - 1 : (new Date().getMonth());
+  })();
+  PIPE_CLIENTS.forEach(c => {
+    const d = S.pipeData[c.key];
+    const h = d ? (d.hours[mIdx] || 0) : 0;
+    const inp = document.querySelector(`.proj-inp[data-proj="${c.key}"]`);
+    if (inp && h > 0) inp.value = h;
+  });
+  refreshProjHours();
+}
+
+/* Excelパイプラインから初期値を pipeData に変換 */
+function renderPipelineInputs() {
+  if (!S.pipeline?.clients) return;
+  initPipeData();
+  S.pipeline.clients.forEach((client, idx) => {
+    const cfg = PIPE_CLIENTS.find(c => client.name.includes(c.key));
+    if (!cfg) return;
+    /* 合計金額を残月数で均等分割してmonthsに初期設定（手動調整前の初期値） */
+    if (S.pipeData[cfg.key].months.every(v=>v===0)) {
+      /* パイプラインは将来月（6月〜12月）に均等配分 */
+      const futureMonths = [5,6,7,8,9,10,11]; // 0-indexed
+      const perMonth = Math.round(client.amount / futureMonths.length);
+      futureMonths.forEach(mi => { S.pipeData[cfg.key].months[mi] = perMonth; });
+    }
+    /* ロジック表示 */
+    const logicEl = document.getElementById(`logic-${idx}`);
+    if (logicEl) logicEl.textContent = client.logic || '';
+  });
+  renderPipeSummary();
+}
+
+/* ④ Project hours */
+function getProjInputs() {
+  const m={};
+  document.querySelectorAll('.proj-inp').forEach(el=>{ m[el.dataset.proj]=Number(el.value)||0; });
+  return m;
+}
+
+function getKadou4() {
+  return (S.kadouData && S.kadouData[S.kadouMode4 || 'current']) || S.kadou || null;
+}
+
+function refreshProjHours() {
+  const kadou4 = getKadou4();
+  const cap  = kadou4?.totalH || 0;
+  const proj = getProjInputs();
+  const totalProj = Object.values(proj).reduce((s,v)=>s+v,0);
+  const surplus = cap - totalProj;
+  const rate = cap>0 ? (totalProj/cap*100).toFixed(1) : '0.0';
+
+  document.getElementById('ps-proj').textContent = totalProj+'H';
+  document.getElementById('ps-cap').textContent  = cap+'H';
+  const sur = document.getElementById('ps-surplus');
+  sur.textContent = (surplus>=0?'+':'')+surplus+'H';
+  sur.style.color = surplus>=0 ? '#1E7D4A' : '#C0392B';
+  document.getElementById('ps-rate').textContent = `案件充足率 ${rate}%（= ${totalProj}H ÷ ${cap}H）`;
+  document.getElementById('ps-status').innerHTML = surplus<0
+    ? `<span style="color:#C0392B">⚠ キャパシティ不足 ${Math.abs(surplus)}H</span>`
+    : `<span style="color:#1E7D4A">◎ キャパシティに不足なし</span><br><span style="color:var(--muted)">余剰 ${surplus}H は営業・社内管理・バッファとして活用可</span>`;
+
+  /* Proj chart */
+  if (charts.proj) { charts.proj.destroy(); charts.proj=null; }
+  const surplusH = Math.max(0, surplus);
+  charts.proj = new Chart(document.getElementById('projChart'), {
+    type:'bar',
+    data: {
+      labels:['案件工数合計（必要）','稼働可能（内訳）'],
+      datasets: [
+        ...PROJ_CONFIG.map(({key,color}) => ({
+          label:`${key}（${proj[key]||0}H）`, data:[proj[key]||0, proj[key]||0],
+          backgroundColor:color, borderWidth:0
+        })),
+        { label:`余剰キャパシティ（${surplusH}H）`, data:[0,surplusH], backgroundColor:'#CDD2E8', borderWidth:0 }
+      ]
+    },
+    options: {
+      indexAxis:'y', responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{ labels:{ boxWidth:12, padding:10 } }, tooltip:{ callbacks:{ label:c=>c.dataset.label+': '+c.raw+'H' } } },
+      scales:{ x:{ stacked:true, grid:{ color:'#E8EBF4' }, ticks:{ callback:v=>v+'H' } }, y:{ stacked:true, grid:{ display:false } } }
+    }
+  });
+
+  /* Save proj hours */
+  S.projHours = proj;
+  saveLS();
+}
+
+/* ⑤ Gantt */
+function renderGantt() {
+  const kadou = S.kadou;
+  /* LocalStorageから復元するとDate型→文字列になるため、Date型へ再変換する */
+  const holidays = (S.holidays || []).map(h => {
+    if (h instanceof Date) return h;
+    const d = new Date(h);
+    return isNaN(d.getTime()) ? null : d;
+  }).filter(Boolean);
+  if (!kadou?.members?.length) {
+    document.getElementById('ganttTbl').innerHTML = '<tr><td class="empty-msg" style="border:none">稼働管理データがありません</td></tr>';
+    return;
+  }
+  /* year/monthが取れなかった場合（ヘッダー形式違い等）は現在日付をフォールバックとして使用 */
+  const now = new Date();
+  const year   = kadou.year  || now.getFullYear();
+  const month  = kadou.month || (now.getMonth() + 1);
+  const members = kadou.members;
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const DOW = ['日','月','火','水','木','金','土'];
+  document.getElementById('ganttTitle').textContent =
+    `メンバー日別稼働可能時間（アサイン計画用ガントチャート）　最下行=日計（全員合計）`;
+
+  /* Day metadata */
+  const dayInfos = Array.from({length:daysInMonth}, (_,i) => {
+    const d=i+1, dt=new Date(year,month-1,d), dow=dt.getDay();
+    const isHol = holidays.some(h => h.getUTCFullYear()===year && h.getUTCMonth()+1===month && h.getUTCDate()===d);
+    return { d, dow:DOW[dow], type: isHol?'hol': (dow===0||dow===6)?'we':'wd' };
+  });
+
+  const cellStyle = (h,t) => {
+    if(t==='we')  return {bg:'#E8EBF4',fg:'#9CA3AF'};
+    if(t==='hol') return {bg:'#FEF6E0',fg:'#92400E'};
+    if(h>=7) return {bg:'#1C2D6B',fg:'#fff'};
+    if(h>=4) return {bg:'#4A85C8',fg:'#fff'};
+    if(h>=1) return {bg:'#B5CEE8',fg:'#1C2D6B'};
+    return {bg:'#F9FAFD',fg:'#D1D5DB'};
+  };
+
+  let html = '<thead><tr>';
+  html += `<th style="text-align:left;padding:5px 10px;min-width:60px">メンバー</th>`;
+  dayInfos.forEach(di => {
+    const bg = di.type==='hol'?'#B07800': di.type==='we'?'#2D4A8A':'#1C2D6B';
+    html += `<th style="background:${bg};min-width:24px;padding:2px 1px"><div style="font-size:10px">${di.d}</div><div style="font-size:8px;opacity:.85">${di.dow}</div></th>`;
+  });
+  html += '<th style="min-width:46px;font-size:10px">合計H</th></tr></thead><tbody>';
+
+  members.forEach(m => {
+    const tot = m.dailyH.slice(0,daysInMonth).reduce((s,v)=>s+(v||0),0);
+    html += `<tr><td class="g-name">${m.name}</td>`;
+    dayInfos.forEach((di,i) => {
+      const h=m.dailyH[i]||0;
+      const {bg,fg}=cellStyle(h,di.type);
+      html += `<td style="background:${bg};color:${fg};border:1px solid #D1D5DB">${h>0?h:''}</td>`;
+    });
+    html += `<td class="g-total">${tot}H</td></tr>`;
+  });
+
+  /* Day total row */
+  html += `<tr><td class="g-name" style="color:var(--muted);font-size:10px">日計（全員）</td>`;
+  let grand=0;
+  dayInfos.forEach((di,i) => {
+    let s=0; members.forEach(m=>{ s+=m.dailyH[i]||0; }); grand+=s;
+    const bg = di.type==='hol'?'#FEF6E0': di.type==='we'?'#E8EBF4': (s>=10?'#D8ECD8':'#F9FAFD');
+    const fg = di.type!=='wd'?'#9CA3AF': (s>=10?'#1E7D4A':'#374151');
+    html += `<td style="background:${bg};color:${fg};border:1px solid #D1D5DB;font-weight:700">${s||''}</td>`;
+  });
+  html += `<td class="g-total">${grand}H</td></tr></tbody>`;
+  document.getElementById('ganttTbl').innerHTML = html;
+}
+
+/* ═════════════════════════════════════════════════════════
+   UI制御・イベント
+═════════════════════════════════════════════════════════ */
+function showDash() {
+  document.getElementById('uploadOverlay').style.display = 'none';
+  document.getElementById('dashboard').style.display = 'block';
+}
+
+function handleFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => processFile(e.target.result);
+  reader.readAsArrayBuffer(file);
+}
+
+/* ═════════════════════════════════════════════════════════
+   初期化
+═════════════════════════════════════════════════════════ */
+function init() {
+  /* Chart.js defaults */
+  if (typeof Chart !== 'undefined') {
+    Chart.defaults.color = '#6B7280';
+    Chart.defaults.font.family = "'Hiragino Sans','Yu Gothic','Meiryo',sans-serif";
+    Chart.defaults.font.size = 10;
+  }
+
+  /* File inputs */
+  document.getElementById('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+  document.getElementById('fileInputHeader').addEventListener('change', e => handleFile(e.target.files[0]));
+
+  /* Dropzone */
+  const dz = document.getElementById('dropzone');
+  dz.addEventListener('dragover',  e => { e.preventDefault(); dz.classList.add('dragging'); });
+  dz.addEventListener('dragleave', () => dz.classList.remove('dragging'));
+  dz.addEventListener('drop', e => { e.preventDefault(); dz.classList.remove('dragging'); handleFile(e.dataTransfer.files[0]); });
+
+  /* Page-wide drop */
+  document.addEventListener('dragover', e => e.preventDefault());
+  document.addEventListener('drop', e => {
+    e.preventDefault();
+    const f = e.dataTransfer.files[0];
+    if (f?.name.endsWith('.xlsx') || f?.name.endsWith('.xls')) handleFile(f);
+  });
+
+  /* Pipeline inputs: 新方式では pm-inp の onchange で処理するため不要 */
+
+  /* Project hours inputs */
+  document.querySelectorAll('.proj-inp').forEach(el => el.addEventListener('change', refreshProjHours));
+
+  /* PL ファイル（要素が存在する場合のみ） */
+  const plMF = document.getElementById('pl-main-file');
+  if (plMF) plMF.addEventListener('change', e => handlePlMainFile(e.target.files[0]));
+  const plFZ = document.getElementById('pl-file-zone');
+  if (plFZ) {
+    plFZ.addEventListener('dragover', e => { e.preventDefault(); plFZ.classList.add('dragging'); });
+    plFZ.addEventListener('dragleave', () => plFZ.classList.remove('dragging'));
+    plFZ.addEventListener('drop', e => { e.preventDefault(); plFZ.classList.remove('dragging'); handlePlMainFile(e.dataTransfer.files[0]); });
+  }
+
+  /* Restore from localStorage */
+  const hasData = loadLS();
+  if (hasData && (S.pl || S.yojitsu)) {
+    showDash();                          // ← 先にDOMを表示
+    if (S.projHours) {
+      document.querySelectorAll('.proj-inp').forEach(el => {
+        if (S.projHours[el.dataset.proj] !== undefined) el.value = S.projHours[el.dataset.proj];
+      });
+    }
+    /* PLの復元ステータス（要素が存在する場合のみ） */
+    if ((S.plActual || S.plBudget) && document.getElementById('pl-file-status')) {
+      const parts=[];
+      if (S.plActualSheet) parts.push(`実績:${S.plActualSheet}`);
+      if (S.plBudgetSheet) parts.push(`予算:${S.plBudgetSheet}`);
+      document.getElementById('pl-file-status').innerHTML =
+        `<span class="pl-status-ok">✓ 前回のデータを復元（${parts.join(' / ')}）</span>`;
+    }
+    setTimeout(() => {
+      if (S.pl) { renderAll(); renderPipeSummary(); }
+      else { renderPLDetail(); }
+    }, 0);
+  }
+  /* else: overlay remains visible */
+}
+
+/* 月ラベル取得ヘルパー */
+function getKadouMonthLabel(mode) {
+  const d = S.kadouData?.[mode];
+  if (!d?.year || !d?.month) return '';
+  return `${d.year}年${d.month}月`;
+}
+
+/* ④ 案件工数 月切り替え */
+function switchKadou4(mode, _synced) {
+  if (!S.kadouData) return;
+  const target = S.kadouData[mode];
+  if (!target) return;
+  const scrollY = window.scrollY;
+  S.kadouMode4 = mode;
+  updateProjNav();
+  refreshProjHours();
+  saveLS();
+  requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+  /* ⑤ガントと同期 */
+  if (!_synced) switchKadou(mode, true);
+}
+
+function updateProjNav() {
+  const m  = S.kadouMode4 || 'current';
+  const kd = S.kadouData || {};
+  const ids = { prev:'p4-btnPrev', current:'p4-btnCur', next:'p4-btnNext' };
+  Object.entries(ids).forEach(([k, id]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = !kd[k];
+    btn.classList.toggle('active', m === k);
+  });
+  /* 月バッジ更新 */
+  const badge = document.getElementById('proj-month-badge');
+  if (badge) {
+    const lbl = getKadouMonthLabel(m);
+    badge.textContent = lbl ? `［${lbl}］` : '';
+  }
+}
+
+/* ⑤ Gantt 月切り替え */
+function switchKadou(mode, _synced) {
+  if (!S.kadouData) return;
+  const target = S.kadouData[mode];
+  if (!target) return;
+
+  /* スクロール位置を保持 */
+  const scrollY = window.scrollY;
+
+  S.kadouMode = mode;
+  S.kadou     = target;
+  updateGanttNav();
+  renderGantt();
+  /* ④案件工数と同期 */
+  if (!_synced) switchKadou4(mode, true);
+  /* ④の合計時間表示だけ更新（Chartは再描画しない） */
+  const cap = S.kadou?.totalH || 0;
+  const proj = getProjInputs();
+  const totalProj = Object.values(proj).reduce((s,v)=>s+v,0);
+  const surplus = cap - totalProj;
+  const rate = cap>0 ? (totalProj/cap*100).toFixed(1) : '0.0';
+  document.getElementById('ps-cap').textContent = cap+'H';
+  const sur = document.getElementById('ps-surplus');
+  sur.textContent = (surplus>=0?'+':'')+surplus+'H';
+  sur.style.color = surplus>=0 ? '#1E7D4A' : '#C0392B';
+  document.getElementById('ps-rate').textContent = `案件充足率 ${rate}%（= ${totalProj}H ÷ ${cap}H）`;
+  document.getElementById('ps-status').innerHTML = surplus<0
+    ? `<span style="color:#C0392B">⚠ キャパシティ不足 ${Math.abs(surplus)}H</span>`
+    : `<span style="color:#1E7D4A">◎ キャパシティに不足なし</span><br><span style="color:var(--muted)">余剰 ${surplus}H は営業・社内管理・バッファとして活用可</span>`;
+
+  saveLS();
+
+  /* レイアウト確定後にスクロール位置を復元 */
+  requestAnimationFrame(() => window.scrollTo({ top: scrollY, behavior: 'instant' }));
+}
+
+function updateGanttNav() {
+  const m   = S.kadouMode || 'current';
+  const kd  = S.kadouData || {};
+  const ids  = { prev:'btnPrevMonth', current:'btnCurMonth', next:'btnNextMonth' };
+  Object.entries(ids).forEach(([k, id]) => {
+    const btn = document.getElementById(id);
+    if (!btn) return;
+    btn.disabled = !kd[k];
+    btn.classList.toggle('active', m === k);
+  });
+  /* 月バッジ更新 */
+  const badge = document.getElementById('gantt-month-badge');
+  if (badge) {
+    const lbl = getKadouMonthLabel(m);
+    badge.textContent = lbl ? `［${lbl}］` : '';
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   タブ切替
+═════════════════════════════════════════════════════════ */
+function switchPage(page) {
+  ['keiei','pl'].forEach(p => {
+    document.getElementById('page-'+p).style.display = p===page ? '' : 'none';
+    document.getElementById('tab-'+p).classList.toggle('active', p===page);
+  });
+  if (page==='pl') {
+    if (S.plBudgetMode==='manual') buildBudgetManualTable();
+    renderPLIfNeeded();
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL 行定義（freee PLシート完全対応）
+═════════════════════════════════════════════════════════ */
+const PL_MONTHS = [1,2,3,4,5,6,7,8,9,10,11,12];
+
+/* id: ユニーク識別子, name: freeeの行名, occ: 同名行の何番目(0始まり)
+   type: 'cat'=カテゴリ見出し / 'det'=明細 / 'tot'=合計・損益
+   bold: 太字, sep: 上に区切り線, sign: 正が好ましい方向(1=増加,-1=減少) */
+const PL_ROWS = [
+  {id:'rev_cat',    name:'売上高',                occ:0, type:'cat', bold:false, sep:false, sign:1 },
+  {id:'rev_det',    name:'売上高',                occ:1, type:'det', bold:false, sep:false, sign:1 },
+  {id:'rev_tot',    name:'売上高 計',             occ:0, type:'tot', bold:true,  sep:false, sign:1 },
+  {id:'cogs_cat',   name:'売上原価',              occ:0, type:'cat', bold:false, sep:true,  sign:-1},
+  {id:'cogs_det',   name:'売上原価',              occ:1, type:'det', bold:false, sep:false, sign:-1},
+  {id:'inv_beg',    name:'期首商品棚卸',          occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'cogs_pur',   name:'当期商品仕入',          occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'cogs_trf',   name:'他勘定振替高(商)',      occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'inv_end',    name:'期末商品棚卸',          occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'cogs_goods', name:'商品売上原価',          occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'gross',      name:'売上総損益金額',        occ:0, type:'tot', bold:true,  sep:true,  sign:1 },
+  {id:'sga_tot',    name:'販売管理費 計',         occ:0, type:'tot', bold:true,  sep:false, sign:-1},
+  {id:'sga_cat',    name:'販売管理費',            occ:0, type:'cat', bold:false, sep:true,  sign:-1},
+  {id:'sga_sub',    name:'外注費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_ent',    name:'交際費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_mtg',    name:'会議費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_trv',    name:'旅費交通費',            occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_tel',    name:'通信費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_sup',    name:'消耗品費',             occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_bks',    name:'新聞図書費',            occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_due',    name:'諸会費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_car',    name:'車両費',               occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_rnt',    name:'地代家賃',              occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'sga_tax',    name:'租税公課',              occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'op_inc',     name:'営業損益金額',          occ:0, type:'tot', bold:true,  sep:true,  sign:1 },
+  {id:'op_rate',    name:'営業利益率',            occ:0, type:'rate', bold:false, sep:false, sign:1, rateNumer:'営業損益金額', rateDenom:'売上高 計'},
+  {id:'non_rev_cat',name:'営業外収益',            occ:0, type:'cat', bold:false, sep:true,  sign:1 },
+  {id:'int_inc',    name:'受取利息',              occ:0, type:'det', bold:false, sep:false, sign:1 },
+  {id:'non_exp_cat',name:'営業外費用',            occ:0, type:'cat', bold:false, sep:false, sign:-1},
+  {id:'def_amo',    name:'繰延資産償却(外)',      occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'ord_inc',    name:'経常損益金額',          occ:0, type:'tot', bold:true,  sep:true,  sign:1 },
+  {id:'sp_rev',     name:'特別利益',              occ:0, type:'cat', bold:false, sep:true,  sign:1 },
+  {id:'sp_exp',     name:'特別損失',              occ:0, type:'cat', bold:false, sep:false, sign:-1},
+  {id:'pre_tax',    name:'税引前当期純損益金額',  occ:0, type:'tot', bold:true,  sep:true,  sign:1 },
+  {id:'tax_cat',    name:'法人税等',              occ:0, type:'cat', bold:false, sep:true,  sign:-1},
+  {id:'tax_det',    name:'法人税等',              occ:1, type:'det', bold:false, sep:false, sign:-1},
+  {id:'tax_adj',    name:'法人税等調整額',        occ:0, type:'det', bold:false, sep:false, sign:-1},
+  {id:'net_inc',    name:'当期純損益金額',        occ:0, type:'tot', bold:true,  sep:true,  sign:1 },
+  {id:'net_rate',   name:'当期純利益率',          occ:0, type:'rate', bold:false, sep:false, sign:1, rateNumer:'当期純損益金額', rateDenom:'売上高 計'},
+];
+
+/* ═════════════════════════════════════════════════════════
+   freee / 予算ファイル パーサー（freee実際フォーマット対応）
+═════════════════════════════════════════════════════════ */
+function parseFreee(sheet) {
+  if (!sheet) return null;
+  /* raw:true でExcelシリアル日付をそのまま数値で受け取る */
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:''});
+  const toNum = v => {
+    if (typeof v === 'number') return v;
+    const n = parseFloat(String(v||'').replace(/[,¥\s△▲\-]/g,''));
+    return isNaN(n) ? 0 : n;
+  };
+  /* Excelシリアル日付 → 月番号(1-12) */
+  const serialToMonth = s => new Date(Math.round((s - 25569) * 86400000)).getUTCMonth() + 1;
+  const isExcelDate   = v => typeof v === 'number' && v > 44000 && v < 50000;
+  const isMonthLabel  = v => { const m = String(v||'').trim().match(/^(\d{1,2})月$/); return m ? parseInt(m[1]) : 0; };
+
+  /* 月ヘッダー行を検索（Excelシリアル or "N月" 両対応） */
+  let hdrIdx = -1, monthCols = [];
+  for (let i = 0; i < Math.min(rows.length, 25); i++) {
+    const mc = [];
+    rows[i].forEach((cell, j) => {
+      if (isExcelDate(cell))     mc.push({col:j, month: serialToMonth(cell)});
+      else { const m=isMonthLabel(cell); if(m) mc.push({col:j, month:m}); }
+    });
+    if (mc.length >= 3) { hdrIdx = i; monthCols = mc; break; }
+  }
+  if (hdrIdx < 0) { monthCols = Array.from({length:12},(_,i)=>({col:i+2,month:i+1})); hdrIdx=0; }
+
+  /* 科目名の列 = 最初の値列の1つ前 */
+  const nameCol = Math.max(0, (monthCols[0]?.col ?? 1) - 1);
+
+  const summary  = {};
+  const allItems = [];
+
+  /* freeeラベル対応パターン（exact優先 → partial） */
+  const PATTERNS = [
+    {key:'売上高',      exact:['売上高 計','売上高合計'],
+                        partial:['売上高']},
+    {key:'売上原価',    exact:['売上原価 計','売上原価合計'],
+                        partial:['売上原価']},
+    {key:'粗利',        exact:['売上総損益金額','売上総利益'],
+                        partial:['売上総損益','売上総利益']},
+    {key:'人件費',      exact:[],
+                        partial:['人件費','給与手当','給料','役員報酬']},
+    {key:'外注費',      exact:['外注費'],
+                        partial:['外注費','外注加工費']},
+    {key:'地代家賃',    exact:['地代家賃'],
+                        partial:['地代家賃','家賃','賃借料']},
+    {key:'その他販管費',exact:[],
+                        partial:[]},
+    {key:'販管費',      exact:['販売管理費 計','販管費 計','販管費合計',
+                               '販売費及び一般管理費 計'],
+                        partial:['販売管理費','販管費','販売費及び一般管理費']},
+    {key:'営業利益',    exact:['営業損益金額','営業利益'],
+                        partial:['営業損益','営業利益']},
+    {key:'経常利益',    exact:['経常損益金額','経常利益'],
+                        partial:['経常損益','経常利益']},
+  ];
+
+  for (let i = hdrIdx + 1; i < rows.length; i++) {
+    const row  = rows[i];
+    const raw  = String(row[nameCol] || '').replace(/^[\s\u3000]+/, '').trim();
+    if (!raw) continue;
+    const vals = monthCols.map(mc => toNum(row[mc.col]));
+    const hasVal = vals.some(v => v !== 0);
+    allItems.push({name:raw, vals, hasVal});
+  }
+
+  /* Phase 1: exact一致（値ゼロ行も含む） */
+  for (const item of allItems) {
+    const nm = item.name.replace(/[\s\u3000]/g, '');
+    for (const p of PATTERNS) {
+      if (summary[p.key]) continue;
+      if (p.exact.some(e => e.replace(/[\s\u3000]/g,'') === nm)) {
+        summary[p.key] = item.vals; break;
+      }
+    }
+  }
+  /* Phase 2: partial一致（値が1つ以上あるもののみ） */
+  for (const item of allItems) {
+    if (!item.hasVal) continue;          // 全ゼロ行はスキップ
+    const nm = item.name.replace(/[\s\u3000]/g, '');
+    for (const p of PATTERNS) {
+      if (summary[p.key]) continue;      // Phase1で確定済みはスキップ
+      if (p.partial.length && p.partial.some(e => nm.includes(e.replace(/[\s\u3000]/g,'')))) {
+        summary[p.key] = item.vals; break;
+      }
+    }
+  }
+  return { summary, allItems, months: monthCols.map(mc => mc.month) };
+}
+
+
+/* ═════════════════════════════════════════════════════════
+   PL 値取得ヘルパー（出現順マッチング）
+═════════════════════════════════════════════════════════ */
+
+/* allItemsからname+occ番目の値配列を取得 */
+function plGetRowVals(rowDef, src) {
+  const data = src === 'actual' ? S.plActual : S.plBudget;
+  /* オーバーライド優先 */
+  const ov = src === 'actual' ? S.plActualOverrides : S.plBudgetOverrides;
+  const ovKey = rowDef.id;
+  /* allItemsから出現順に検索 */
+  if (data?.allItems) {
+    let cnt = 0;
+    for (const item of data.allItems) {
+      if (item.name === rowDef.name) {
+        if (cnt === rowDef.occ) {
+          /* オーバーライドがあれば各月に適用 */
+          if (ov?.[ovKey]) {
+            return item.vals.map((v, mi) => ov[ovKey][mi] !== undefined ? ov[ovKey][mi] : v);
+          }
+          return item.vals;
+        }
+        cnt++;
+      }
+    }
+  }
+  /* データなし or 該当行なし → オーバーライドだけ返す */
+  if (ov?.[ovKey]) return ov[ovKey].map(v => v ?? 0);
+  return null;
+}
+
+/* 月インデックス(0-11) → 実際の月番号(1-12)との対応 */
+function plMonthIdx(mi, src) {
+  const data = src === 'actual' ? S.plActual : S.plBudget;
+  const months = data?.months || PL_MONTHS;
+  return months[mi] ?? (mi + 1);
+}
+
+/* 特定月の値を1つ取得 */
+function plValAt(rowDef, mi, src) {
+  const vals = plGetRowVals(rowDef, src);
+  return vals ? (vals[mi] ?? 0) : 0;
+}
+
+/* 年間合計 */
+function plAnnualRow(rowDef, src) {
+  const vals = plGetRowVals(rowDef, src);
+  if (!vals) return 0;
+  return vals.reduce((s, v) => s + (v || 0), 0);
+}
+
+/* 表示用の月ラベルを実データから生成 */
+function plGetMonths() {
+  const months = S.plActual?.months || S.plBudget?.months || PL_MONTHS;
+  return months;
+}
+
+const fmtPL = v => {
+  if (v === null || v === undefined || isNaN(v)) return '--';
+  const abs = Math.abs(Math.round(v));
+  return (v < 0 ? '△' : '') + abs.toLocaleString('ja-JP');
+};
+const diffColor = (diff, sign) => (diff * sign >= 0) ? '#1E7D4A' : '#C0392B';
+
+/* ═════════════════════════════════════════════════════════
+   PL KPI カード
+═════════════════════════════════════════════════════════ */
+function renderPLKPIs() {
+  const cfg = [
+    {rowId:'rev_tot', label:'売上高 計',      color:'#1C2D6B', idx:0},
+    {rowId:'gross',   label:'売上総損益金額', color:'#1E7D4A', idx:1},
+    {rowId:'op_inc',  label:'営業損益金額',   color:'#F0A000', idx:2},
+  ];
+  cfg.forEach(({rowId,label,color,idx}) => {
+    const rowDef = PL_ROWS.find(r => r.id === rowId);
+    const act = rowDef ? plAnnualRow(rowDef,'actual') : 0;
+    const bud = rowDef ? plAnnualRow(rowDef,'budget') : 0;
+    const diff = act - bud;
+    const rate = bud ? (act/bud*100).toFixed(1)+'%' : '0.0%';
+    const dc = bud ? diffColor(diff, rowDef?.sign ?? 1) : '#6B7280';
+    const el = document.getElementById(`pl-kpi-${idx}`);
+    if (!el) return;
+    el.innerHTML = `
+      <div class="kpi-lbl">${label}</div>
+      <div style="display:flex;gap:14px;align-items:flex-end;margin-top:8px;flex-wrap:wrap">
+        <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">実績（年計）</div>
+          <div style="font-size:19px;font-weight:700;color:${color}">${act?fmtPL(act)+'円':'--'}</div></div>
+        <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">予算</div>
+          <div style="font-size:13px;font-weight:600;color:var(--muted)">${bud?fmtPL(bud)+'円':'--'}</div></div>
+        <div><div style="font-size:9px;color:var(--muted);margin-bottom:2px">達成率</div>
+          <div style="font-size:14px;font-weight:700;color:${dc}">${rate}</div></div>
+      </div>
+      <div class="kpi-bar" style="margin-top:10px">
+        <div class="kpi-fill" style="width:${bud?Math.min(100,act/bud*100):0}%;background:${color}"></div>
+      </div>`;
+  });
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL 年間サマリー表
+═════════════════════════════════════════════════════════ */
+function renderPLSummaryTable() {
+  const hasBudget = !!S.plBudget;
+  let html = '<table class="pl-tbl"><thead><tr>';
+  html += '<th style="text-align:left;min-width:200px">科目</th>';
+  html += '<th style="min-width:110px">実績（年）</th>';
+  if (hasBudget) {
+    html += '<th style="min-width:110px">予算（年）</th>';
+    html += '<th style="min-width:110px">差異</th>';
+    html += '<th style="min-width:72px">達成率</th>';
+  }
+  html += '</tr></thead><tbody>';
+  PL_ROWS.forEach(row => {
+    const isCat = row.type==='cat', isTot = row.type==='tot';
+    const act = plAnnualRow(row,'actual');
+    const bud = hasBudget ? plAnnualRow(row,'budget') : null;
+    const diff = bud!==null ? act-bud : null;
+    const rate = bud ? (act/bud*100).toFixed(1)+'%' : '0.0%';
+    const dc = diff!==null ? diffColor(diff,row.sign) : '#6B7280';
+    const sepStyle = row.sep ? 'border-top:2px solid var(--navy)' : '';
+    const nameCls = isCat ? 'pl-name' : isTot ? 'pl-name bold' : 'pl-name l1';
+    html += `<tr class="${isTot?'bold-row':''}" style="${sepStyle}">`;
+    html += `<td class="${nameCls}">${row.name}</td>`;
+    html += `<td class="num" style="font-weight:${isTot?700:400}">${!isCat?fmtPL(act):''}</td>`;
+    if (hasBudget) {
+      html += `<td class="num" style="background:#EFF1F7">${!isCat&&bud!==null?fmtPL(bud):''}</td>`;
+      html += `<td class="num" style="color:${dc}">${!isCat?FCD(diff):''}</td>`;
+      html += `<td class="num" style="color:${dc}">${!isCat&&bud?rate:''}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  document.getElementById('pl-summary-tbl').innerHTML = html;
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL 月別詳細表（ダブルクリック編集対応）
+═════════════════════════════════════════════════════════ */
+function renderPLMonthlyTable() {
+  const months    = plGetMonths();
+  const hasBudget = !!S.plBudget;
+  const colSpan   = hasBudget ? 3 : 1;
+  let html = '<div style="overflow-x:auto"><table class="pl-tbl" id="pl-monthly-inner"><thead>';
+  html += '<tr><th rowspan="2" style="text-align:left;min-width:170px;position:sticky;left:0;z-index:2;background:var(--navy)">科目</th>';
+  months.forEach(m => html += `<th colspan="${colSpan}">${m}月</th>`);
+  html += `<th colspan="${colSpan}">年間合計</th></tr>`;
+  if (hasBudget) {
+    html += '<tr>';
+    [...months,null].forEach(() => html += '<th class="sub">実績</th><th class="sub">予算</th><th class="sub">差異</th>');
+    html += '</tr>';
+  }
+  html += '</thead><tbody>';
+  PL_ROWS.forEach(row => {
+    const isCat = row.type==='cat', isTot = row.type==='tot';
+    const sepStyle = row.sep ? 'border-top:2px solid var(--navy)' : '';
+    const nameCls  = isCat ? 'pl-name' : isTot ? 'pl-name bold' : 'pl-name l1';
+    const nameBg   = isTot ? '#D8E4F0' : isCat ? 'var(--navy-pale)' : '#fff';
+    const actVals  = plGetRowVals(row,'actual');
+    const budVals  = hasBudget ? plGetRowVals(row,'budget') : null;
+    html += `<tr class="${isTot?'bold-row':''}" style="${sepStyle}">`;
+    html += `<td class="${nameCls}" style="position:sticky;left:0;z-index:1;background:${nameBg}">${row.name}</td>`;
+    let annA=0, annB=0;
+    months.forEach((_,mi) => {
+      const a = actVals ? (actVals[mi]??0) : 0;
+      const b = budVals ? (budVals[mi]??0) : 0;
+      annA+=a; annB+=b;
+      const d=a-b, dc=diffColor(d,row.sign);
+      const aOvr = S.plActualOverrides?.[row.id]?.[mi]!==undefined;
+      const bOvr = S.plBudgetOverrides?.[row.id]?.[mi]!==undefined;
+      if (isCat) {
+        html += `<td colspan="${colSpan}" style="background:#F5F6FA"></td>`;
+      } else if (hasBudget) {
+        html += `<td class="num" style="font-size:10px;font-weight:${isTot?700:400};${aOvr?'background:#FFF8E8':''}"
+          data-rowid="${row.id}" data-mi="${mi}" data-src="actual" ondblclick="plCellEdit(this)">${fmtPL(a)}</td>`;
+        html += `<td class="num" style="font-size:10px;background:${bOvr?'#FFF8E8':'#EFF1F7'}"
+          data-rowid="${row.id}" data-mi="${mi}" data-src="budget" ondblclick="plCellEdit(this)">${fmtPL(b)}</td>`;
+        html += `<td class="num" style="font-size:10px;color:${dc}">${fmtPL(d)}</td>`;
+      } else {
+        html += `<td class="num" style="font-size:10px;font-weight:${isTot?700:400};${aOvr?'background:#FFF8E8':''}"
+          data-rowid="${row.id}" data-mi="${mi}" data-src="actual" ondblclick="plCellEdit(this)">${fmtPL(a)}</td>`;
+      }
+    });
+    const dc = diffColor(annA-annB, row.sign);
+    if (isCat) {
+      html += `<td colspan="${colSpan}"></td>`;
+    } else if (hasBudget) {
+      html += `<td class="num" style="font-weight:700">${fmtPL(annA)}</td>`;
+      html += `<td class="num" style="font-weight:700;background:#EFF1F7">${fmtPL(annB)}</td>`;
+      html += `<td class="num" style="font-weight:700;color:${dc}">${fmtPL(annA-annB)}</td>`;
+    } else {
+      html += `<td class="num" style="font-weight:700">${fmtPL(annA)}</td>`;
+    }
+    html += '</tr>';
+  });
+  html += '</tbody></table></div>';
+  document.getElementById('pl-monthly-tbl').innerHTML = html;
+}
+
+/* ── ダブルクリックでセル編集 ── */
+function plCellEdit(td) {
+  if (td.querySelector('input')) return;
+  const rowId=td.dataset.rowid, mi=parseInt(td.dataset.mi), src=td.dataset.src;
+  const rowDef = PL_ROWS.find(r=>r.id===rowId);
+  if (!rowDef) return;
+  const cur  = plValAt(rowDef,mi,src);
+  const orig = td.innerHTML;
+  td.innerHTML = `<input type="number" step="1000"
+    style="width:74px;font-size:10px;border:1px solid var(--orange);border-radius:3px;padding:2px 4px;text-align:right;font-family:inherit;background:#FFFBF0"
+    value="${cur||''}">`;
+  const inp = td.querySelector('input');
+  inp.focus(); inp.select();
+  const save = () => {
+    const v = parseFloat(inp.value);
+    const ov = src==='actual' ? S.plActualOverrides : S.plBudgetOverrides;
+    if (!ov[rowId]) ov[rowId] = Array(12).fill(undefined);
+    ov[rowId][mi] = isNaN(v) ? undefined : v;
+    saveLS();
+    renderPLMonthlyTable();
+    renderPLKPIs();
+    renderPLSummaryTable();
+  };
+  inp.addEventListener('blur', save);
+  inp.addEventListener('keydown', e => { if(e.key==='Enter') inp.blur(); if(e.key==='Escape') td.innerHTML=orig; });
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL チャート（非表示中だがAPIは残す）
+═════════════════════════════════════════════════════════ */
+function renderPLChart() { /* グラフは現在非表示 */ }
+
+/* ═════════════════════════════════════════════════════════
+   PLビュー切替
+═════════════════════════════════════════════════════════ */
+function switchPLView(view) {
+  document.getElementById('pl-view-summary').style.display = view==='summary'?'':'none';
+  document.getElementById('pl-view-monthly').style.display = view==='monthly'?'':'none';
+  document.getElementById('pl-tab-summary').classList.toggle('active', view==='summary');
+  document.getElementById('pl-tab-monthly').classList.toggle('active', view==='monthly');
+  if (view==='monthly') renderPLMonthlyTable();
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL まとめて描画
+═════════════════════════════════════════════════════════ */
+function renderPLIfNeeded() {
+  const pg = document.getElementById('page-pl');
+  if (!pg) return;
+  // pl-summary-tbl が存在する場合のみ旧サマリーを描画
+  if (document.getElementById('pl-summary-tbl')) {
+    renderPLKPIs();
+    renderPLSummaryTable();
+    if (document.getElementById('pl-view-monthly') && 
+        document.getElementById('pl-view-monthly').style.display!=='none') {
+      renderPLMonthlyTable();
+    }
+  }
+}
+
+/* ═════════════════════════════════════════════════════════
+   PL ファイル読み込み（シート統合版）
+═════════════════════════════════════════════════════════ */
+let _plWbParsed = {};  // {sheetName: parsedData} — メモリのみ
+
+function handlePlMainFile(file) {
+  if (!file) return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    try {
+      const wb=XLSX.read(e.target.result,{type:'array'});
+      _plWbParsed={};
+      wb.SheetNames.forEach(sn=>{ _plWbParsed[sn]=parseFreee(wb.Sheets[sn]); });
+
+      /* シート選択UIを表示 */
+      const sel1=document.getElementById('pl-actual-sel');
+      const sel2=document.getElementById('pl-budget-sel');
+      sel1.innerHTML='<option value="">-- 選択 --</option>';
+      sel2.innerHTML='<option value="">-- 選択 --</option>';
+      wb.SheetNames.forEach(sn=>{
+        sel1.innerHTML+=`<option value="${sn}">${sn}</option>`;
+        sel2.innerHTML+=`<option value="${sn}">${sn}</option>`;
+      });
+      /* 自動判定 */
+      wb.SheetNames.forEach(sn=>{
+        const n=sn.toLowerCase();
+        if (!sel1.value && (n.includes('実績')||n.includes('actual')||n.includes('pl'))) sel1.value=sn;
+        if (!sel2.value && (n.includes('予算')||n.includes('budget')||n.includes('plan'))) sel2.value=sn;
+      });
+      /* 前回の割り当てがあれば復元 */
+      if (S.plActualSheet && wb.SheetNames.includes(S.plActualSheet)) sel1.value=S.plActualSheet;
+      if (S.plBudgetSheet && wb.SheetNames.includes(S.plBudgetSheet)) sel2.value=S.plBudgetSheet;
+
+      document.getElementById('pl-sheet-assign').style.display='';
+      document.getElementById('pl-file-status').innerHTML=
+        `<span class="pl-status-ok">✓ ${file.name} 読み込み完了（${wb.SheetNames.length}シート）</span>`;
+    } catch(err) {
+      document.getElementById('pl-file-status').innerHTML=
+        `<span style="color:#C0392B">エラー: ${err.message}</span>`;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function applySheetAssign() {
+  const actualSn=document.getElementById('pl-actual-sel').value;
+  const budgetSn=document.getElementById('pl-budget-sel').value;
+  if (!actualSn && !budgetSn) { alert('実績・予算いずれかのシートを選択してください'); return; }
+  if (actualSn) { S.plActual=_plWbParsed[actualSn]; S.plActualSheet=actualSn; S.plActualOverrides={}; }
+  if (budgetSn) { S.plBudget=_plWbParsed[budgetSn]; S.plBudgetSheet=budgetSn; S.plBudgetOverrides={}; }
+  saveLS();
+  renderPLIfNeeded();
+  const btn=document.querySelector('#pl-sheet-assign .btn-sm-orange');
+  if(btn){btn.textContent='✓ 取り込みました';setTimeout(()=>btn.textContent='✓ 取り込む',1800);}
+}
+
+/* Wait for XLSX + Chart.js before init */
+/* ══════════════════════════════════════════════════════════════
+   PL詳細タブ：パーサー
+══════════════════════════════════════════════════════════════ */
+
+/* ═════════════════════════════════════════════════════════
+   予実管理 新形式: 実績シート + 予算シートに分離されたバージョン
+   実績: col0=科目, col1=Jan, col2=Feb ... col12=Dec
+   予算: col0=科目, col1=Jan予算, col2=Jan_FC, col3=Feb予算, col4=Feb_FC ...
+═════════════════════════════════════════════════════════ */
+function parseYojitsuSplit(actualSheet, budgetSheet) {
+  if (!actualSheet && !budgetSheet) return null;
+  const num = v => (typeof v === 'number' ? v : 0);
+  const rawByKey = {}, budByKey = {}, fcByKey = {};
+
+  /* 実績シートを読む */
+  if (actualSheet) {
+    const rows = XLSX.utils.sheet_to_json(actualSheet, {header:1, raw:true, defval:null});
+    rows.forEach(row => {
+      if (!row || row[0] == null) return;
+      const lbl = row[0].toString().replace(/^[\s\u3000]+/,'').trim();
+      if (!lbl) return;
+      const act12 = [];
+      for (let m = 0; m < 12; m++) act12.push(num(row[1 + m]));
+      rawByKey[lbl] = act12;
+    });
+  }
+
+  /* 予算シートを読む: 奇数col=予算, 偶数col=Forecast */
+  if (budgetSheet) {
+    const rows = XLSX.utils.sheet_to_json(budgetSheet, {header:1, raw:true, defval:null});
+    rows.forEach(row => {
+      if (!row || row[0] == null) return;
+      const lbl = row[0].toString().replace(/^[\s\u3000]+/,'').trim();
+      if (!lbl) return;
+      const bud12 = [], fc12 = [];
+      for (let m = 0; m < 12; m++) {
+        bud12.push(num(row[1 + m * 2]));
+        fc12.push(num(row[2 + m * 2]));
+      }
+      budByKey[lbl] = bud12;
+      fcByKey[lbl]  = fc12;
+    });
+  }
+
+  /* その他経費 計算（parseYojitsuと同じ） */
+  const OTHER_SGA_EXCL = ['外注費','旅費交通費','会議費','交際費'];
+  const mainSGA = OTHER_SGA_EXCL.reduce((acc, k) => {
+    if (rawByKey[k]) acc = acc.map((v,i) => v + rawByKey[k][i]);
+    return acc;
+  }, Array(12).fill(0));
+  const sgaTot  = rawByKey['販売管理費 計'] || Array(12).fill(0);
+  const otherSGA = sgaTot.map((v, i) => v - mainSGA[i]);
+
+  const EXCL_LABELS = ['売上高','売上高 計','売上原価','売上総損益金額','販売管理費','販売管理費 計',
+    '営業損益金額','営業外収益','営業外費用','受取利息','経常損益金額',
+    '特別利益','特別損失','税引前当期純損益金額','法人税等','法人税等調整額','当期純損益金額',
+    '繰延資産償却(外)','現預金','商品売上原価','期首商品棚卸','当期商品仕入',
+    '他勘定振替高(商)','期末商品棚卸'];
+  const otherDetailRows = [];
+  Object.keys(rawByKey).forEach(lbl => {
+    if (EXCL_LABELS.includes(lbl) || OTHER_SGA_EXCL.includes(lbl)) return;
+    if (rawByKey[lbl].every(v => v === 0)) return;
+    otherDetailRows.push({label:lbl, actual:rawByKey[lbl], budget:budByKey[lbl]||Array(12).fill(0), fc:fcByKey[lbl]||Array(12).fill(0)});
+  });
+
+  rawByKey['__other'] = otherSGA;
+  budByKey['__other'] = Array(12).fill(0);
+  fcByKey['__other']  = Array(12).fill(0);
+
+  const PL_ROWS_LOCAL = [
+    {label:'売上高',       key:'売上高',           level:0, isHeader:false, isSummary:false},
+    {label:'売上総損益',   key:'売上総損益金額',    level:0, isSummary:true},
+    {label:'販管費 計',    key:'販売管理費 計',     level:0, isSummary:true},
+    {label:'　外注費',     key:'外注費',            level:1},
+    {label:'　旅費交通費', key:'旅費交通費',         level:1},
+    {label:'　会議費',     key:'会議費',            level:1},
+    {label:'　交際費',     key:'交際費',            level:1},
+    {label:'　その他経費▼',key:'__other',           level:1, isOtherHead:true},
+    {label:'営業利益',     key:'営業損益金額',       level:0, isSummary:true},
+    {label:'営業利益率',   key:'__op_rate',         level:0, isRate:true, numer:'営業損益金額', denom:'売上高 計'},
+    {label:'営業外収益',   key:'営業外収益',         level:0},
+    {label:'営業外費用',   key:'営業外費用',         level:0},
+    {label:'経常利益',     key:'経常損益金額',       level:0, isSummary:true},
+    {label:'当期純損益',   key:'当期純損益金額',     level:0, isSummary:true},
+    {label:'当期純利益率', key:'__net_rate',        level:0, isRate:true, numer:'当期純損益金額', denom:'売上高 計'},
+  ];
+
+  return { plRows:PL_ROWS_LOCAL, rawByKey, budByKey, fcByKey, otherDetailRows, months:[1,2,3,4,5,6,7,8,9,10,11,12] };
+}
+
+/* 予実管理シート
+   Row1=タイトル, Row2=月ヘッダー(奇数col=実績,偶数col=予算), Row3=実績/予算ラベル
+   Data from Row4. Col0=科目, col1=Jan実績, col2=Jan予算, col3=Feb実績 ...
+   ただしシートは A1:AN1001 → col0=A=科目 */
+function parseYojitsu(sheet) {
+  if (!sheet) return null;
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  // Row2(idx1): month dates alternating actual/budget
+  // Col mapping: col1=Jan実績,col2=Jan予算,...col23=Dec実績,col24=Dec予算
+  const MONTHS = 12;
+  const actual = {}, budget = {};
+  const num = v => (typeof v==='number' ? v : 0);
+
+  // PL row definitions  { label, key, level, isSummary, isHeader }
+  const PL_ROWS = [
+    {label:'売上高', key:'売上高',       level:0, isHeader:false, isSummary:false},
+    {label:'売上総損益', key:'売上総損益金額', level:0, isSummary:true},
+    {label:'販管費 計', key:'販売管理費 計', level:0, isSummary:true},
+    {label:'　外注費', key:'外注費',      level:1},
+    {label:'　旅費交通費', key:'旅費交通費', level:1},
+    {label:'　会議費', key:'会議費',      level:1},
+    {label:'　交際費', key:'交際費',      level:1},
+    {label:'　その他経費▼', key:'__other', level:1, isOtherHead:true},
+    {label:'営業利益', key:'営業損益金額',  level:0, isSummary:true},
+    {label:'営業利益率', key:'__op_rate', level:0, isRate:true, numer:'営業損益金額', denom:'売上高 計'},
+    {label:'営業外収益', key:'営業外収益',  level:0},
+    {label:'営業外費用', key:'営業外費用',  level:0},
+    {label:'経常利益', key:'経常損益金額',  level:0, isSummary:true},
+    {label:'当期純損益', key:'当期純損益金額', level:0, isSummary:true},
+    {label:'当期純利益率', key:'__net_rate', level:0, isRate:true, numer:'当期純損益金額', denom:'売上高 計'},
+  ];
+  const OTHER_SGA_EXCL = ['外注費','旅費交通費','会議費','交際費'];
+  const OTHER_SGA_DETAIL_ROWS = [];
+  const rawByKey = {}; // key → [12 actual values]
+  const budByKey = {};
+
+  rows.forEach(row => {
+    if (!row || row[0] == null) return;
+    const lbl = row[0].toString().replace(/^[\s\u3000]+/,'').trim();
+    const act12 = [], bud12 = [];
+    for (let m=0;m<12;m++) { act12.push(num(row[1+m*2])); bud12.push(num(row[2+m*2])); }
+    rawByKey[lbl] = act12;
+    budByKey[lbl] = bud12;
+  });
+
+  // Compute その他経費 = 販管費計 - main items
+  const mainSGA = OTHER_SGA_EXCL.reduce((acc,k) => {
+    if (rawByKey[k]) acc = acc.map((v,i)=>v + rawByKey[k][i]);
+    return acc;
+  }, Array(12).fill(0));
+  const sgaTot = rawByKey['販売管理費 計'] || Array(12).fill(0);
+  const otherSGA = sgaTot.map((v,i) => v - mainSGA[i]);
+
+  // Collect detail rows for その他経費
+  const otherDetailRows = [];
+  Object.keys(rawByKey).forEach(lbl => {
+    if (!lbl || ['売上高','売上高 計','売上原価','売上総損益金額','販売管理費','販売管理費 計',
+       '営業損益金額','営業外収益','営業外費用','受取利息','経常損益金額',
+       '特別利益','特別損失','税引前当期純損益金額','法人税等','法人税等調整額','当期純損益金額',
+       '繰延資産償却(外)','現預金','商品売上原価','期首商品棚卸','当期商品仕入',
+       '他勘定振替高(商)','期末商品棚卸'].includes(lbl)) return;
+    if (OTHER_SGA_EXCL.includes(lbl)) return;
+    if (rawByKey[lbl].every(v=>v===0)) return;
+    otherDetailRows.push({label:lbl, actual:rawByKey[lbl], budget:budByKey[lbl]||Array(12).fill(0), fc:budByKey[lbl]||Array(12).fill(0)});
+  });
+
+  rawByKey['__other'] = otherSGA;
+  budByKey['__other'] = Array(12).fill(0);
+
+  /* 旧形式では予算列をForecastとして兼用 */
+  const fcByKey = budByKey;
+
+  return {
+    plRows: PL_ROWS,
+    rawByKey,
+    budByKey,
+    fcByKey,
+    otherDetailRows,
+    months: [1,2,3,4,5,6,7,8,9,10,11,12],
+  };
+}
+
+/* BS推移シート
+   Row1=タイトル, Row2=月ヘッダー(col1=期首, col2=Jan, col3=Feb...col13=Dec)
+   住信ＳＢＩネット（法人）row → cash by month */
+function parseBS(sheet) {
+  if (!sheet) return null;
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  const num = v => (typeof v==='number' ? v : 0);
+
+  /* 新形式: idx0=ラベル, idx1=期首, idx2=Jan_actual, idx3=Jan_FC, idx4=Feb_actual...
+     旧形式: idx0=ラベル, idx1=期首, idx2=Jan, idx3=Feb... (12列のみ)
+     Row3を見てactual/Forecastラベルがあれば新形式と判断 */
+  /* 新形式検出: 'actual'/'Forecast' ラベル行があるか全行スキャン */
+  let isNewFormat = false;
+  for (const row of rows) {
+    if (!row) continue;
+    const hasActual   = row.some(v => v === 'actual');
+    const hasForecast = row.some(v => v === 'Forecast');
+    if (hasActual && hasForecast) { isNewFormat = true; break; }
+    /* SBI行に達したら走査終了（データ行より先には出てこない） */
+    if (row[0] && typeof row[0]==='string' && row[0].includes('ＳＢＩ')) break;
+  }
+
+  const cashAct = Array(12).fill(0);
+  const cashFC  = Array(12).fill(0);
+
+  rows.forEach(row => {
+    if (!row || row[0] == null) return;
+    const lbl = row[0].toString().trim();
+    if (lbl.includes('ＳＢＩ') || lbl === '現金及び預金' || lbl.includes('現金')) {
+      if (isNewFormat) {
+        // actual: idx2+m*2, forecast: idx3+m*2
+        for (let m=0; m<12; m++) {
+          cashAct[m] = num(row[2+m*2]);
+          cashFC[m]  = num(row[3+m*2]);
+        }
+      } else {
+        // 旧形式: idx2=Jan..idx13=Dec
+        for (let m=0; m<12; m++) {
+          cashAct[m] = num(row[2+m]);
+          cashFC[m]  = num(row[2+m]);
+        }
+      }
+    }
+  });
+  return { cash: cashAct, cashFC, isNewFormat };
+}
+
+/* 総勘定元帳シート
+   Row1=タイトル, Row2=ヘッダー, Data from Row3
+   cols: 0=勘定科目, 1=取引日, 3=相手勘定科目, 10=備考, 20=借方, 21=貸方, 27=貸借差額, 31=月 */
+function parseGL(sheet) {
+  if (!sheet) return null;
+  const rows = XLSX.utils.sheet_to_json(sheet, {header:1, raw:true, defval:null});
+  const entries = [];
+  rows.forEach((row, ri) => {
+    if (ri < 2 || !row || !row[0]) return;
+    const month = typeof row[31]==='number' ? row[31] : null;
+    if (!month) return;
+    const dateVal = row[1];
+    let dateStr = '';
+    if (typeof dateVal === 'number') {
+      const d = new Date((dateVal-25569)*86400000);
+      dateStr = `${d.getUTCFullYear()}/${String(d.getUTCMonth()+1).padStart(2,'0')}/${String(d.getUTCDate()).padStart(2,'0')}`;
+    } else if (dateVal) dateStr = String(dateVal).slice(0,10);
+    entries.push({
+      科目: String(row[0]||'').trim(),
+      日付: dateStr,
+      相手勘定: String(row[3]||'').trim(),
+      備考: String(row[10]||'').trim(),
+      借方: typeof row[20]==='number' ? row[20] : 0,
+      貸方: typeof row[21]==='number' ? row[21] : 0,
+      差額: typeof row[27]==='number' ? row[27] : 0,
+      月: month,
+    });
+  });
+  return entries;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   PL詳細タブ：描画
+══════════════════════════════════════════════════════════════ */
+const MONTH_NAMES = ['1月','2月','3月','4月','5月','6月','7月','8月','9月','10月','11月','12月'];
+const F2 = v => {
+  const n = Math.round(v);
+  if (n === 0) return '-';
+  return (n>=0?'':'-') + '¥' + Math.abs(n).toLocaleString('ja-JP');
+};
+const FC = v => { // for cells: no ¥, just number
+  if (v===null||v===undefined) return '-';
+  if (v===0) return '-';
+  return Math.round(v).toLocaleString('ja-JP');
+};
+/* 差分専用: 0のときも '0' と表示する */
+const FCD = v => {
+  if (v===null||v===undefined) return '0';
+  return v===0 ? '0' : Math.round(v).toLocaleString('ja-JP');
+};
+const numClass = (v, invert) => {
+  if (!v || v===0) return '';
+  const pos = invert ? v < 0 : v > 0;
+  return pos ? 'pos' : 'neg';
+};
+
+/* ── Actual/Forecast 切替 ──────────────────────────────────── */
+function setPLMode(mode) {
+  S.plMode = mode;
+  /* ボタンスタイル更新 */
+  const btnA = document.getElementById('pl-mode-actual');
+  const btnF = document.getElementById('pl-mode-forecast');
+  if (btnA && btnF) {
+    if (mode === 'actual') {
+      btnA.style.cssText += ';background:var(--navy);color:#fff;border-color:var(--navy)';
+      btnF.style.cssText += ';background:var(--white);color:var(--muted);border-color:var(--border)';
+    } else {
+      btnF.style.cssText += ';background:var(--orange);color:var(--navy);border-color:var(--orange)';
+      btnA.style.cssText += ';background:var(--white);color:var(--muted);border-color:var(--border)';
+    }
+  }
+  /* Forecastモード時はドリルスルーを非表示 */
+  const drill = document.getElementById('pl4-card');
+  if (drill && mode === 'forecast') drill.style.display = 'none';
+  renderPLKPIBoxes();
+  renderPL1();
+  renderPL2();
+  renderPL2KPIs();
+  renderPL3();
+}
+
+/* モードに応じたデータ取得ヘルパー */
+function getActArr(key) {
+  return S.yojitsu?.rawByKey?.[key] || Array(12).fill(0);
+}
+function getFCArr(key) {
+  /* 新形式ではfcByKeyにForecast, 旧形式ではbudByKeyをForecastとして使用 */
+  return S.yojitsu?.fcByKey?.[key] || S.yojitsu?.budByKey?.[key] || Array(12).fill(0);
+}
+function getPLArr(key) {
+  return S.plMode === 'forecast' ? getFCArr(key) : getActArr(key);
+}
+function getCash() {
+  if (!S.bsData) return Array(12).fill(0);
+  /* cashFC が未定義 or 空配列の場合は cash にフォールバック */
+  const fc = S.bsData.cashFC;
+  return S.plMode === 'forecast' && Array.isArray(fc) && fc.some(v=>v!==0)
+    ? fc : S.bsData.cash;
+}
+
+/* ── 期間ヘルパー ────────────────────────────────────────────── */
+const PERIOD_MONTHS = {
+  '1Q':  [0,1,2],
+  '2Q':  [3,4,5],
+  '3Q':  [6,7,8],
+  '4Q':  [9,10,11],
+  '上期': [0,1,2,3,4,5],   // 1Q+2Q (Jan-Jun)
+  '下期': [6,7,8,9,10,11], // 3Q+4Q (Jul-Dec)
+  '通期': [0,1,2,3,4,5,6,7,8,9,10,11],
+};
+
+function getPeriodIndices() {
+  if (S.plSelPeriod && PERIOD_MONTHS[S.plSelPeriod]) return PERIOD_MONTHS[S.plSelPeriod];
+  return null; // 月選択モード
+}
+
+function sumAcross(arr, idxList) {
+  if (!arr) return 0;
+  return idxList.reduce((s,i)=>s+(arr[i]||0),0);
+}
+
+function selectPLPeriod(period) {
+  S.plSelPeriod = period;
+  // 期間選択時は月選択を解除
+  document.querySelectorAll('.pl-month-btn').forEach(b=>b.classList.remove('active'));
+  document.querySelectorAll('.pl-period-btn').forEach(b=>b.classList.toggle('active', b.dataset.period===period));
+  updatePLBadge();
+  renderPLKPIBoxes();   // 期間変更時もKPI6枚を再集計
+  renderPL1(); renderPL2KPIs(); closeDrill();
+}
+
+function updatePLBadge() {
+  const badge = document.getElementById('pl-selected-month-badge');
+  if (!badge) return;
+  if (S.plSelPeriod) badge.textContent = `2026年 ${S.plSelPeriod}`;
+  else badge.textContent = `2026年${S.plSelMonth}月`;
+}
+
+/* KPIボックスを更新（月 or 期間に対応） */
+function renderPLKPIBoxes() {
+  const yd = S.yojitsu;
+  if (!yd) return;
+  const idxList = S.plSelPeriod ? PERIOD_MONTHS[S.plSelPeriod]
+                  : [(S.plSelMonth||1)-1];
+
+  /* 選択月/期間がForecast月かどうか判定 */
+  function isIdxClosed(idx) {
+    const sga = yd.rawByKey?.['販売管理費 計'];
+    return sga ? (sga[idx] || 0) !== 0 : false;
+  }
+  const selClosed = S.plSelPeriod
+    ? isIdxClosed(idxList[idxList.length-1])
+    : isIdxClosed(idxList[0]);
+
+  /* パイプライン月別加算（未確定月のみ） */
+  const pipeKeys = new Set(['売上高','売上高 計','売上総損益金額','営業損益金額','経常損益金額','当期純損益金額']);
+  const pipeArr = getPipeMonthlyTotal();
+  const pipeAdd = (k) => (!selClosed && pipeKeys.has(k)) ? sumAcross(pipeArr, idxList) : 0;
+
+  const act = k => sumAcross(getPLArr(k), idxList) + pipeAdd(k);
+  const bud = k => sumAcross(yd.budByKey[k], idxList);
+  const rate = (a,b) => b ? (a/b*100).toFixed(1)+'%' : '0.0%';
+  const barW = (a,b) => b ? Math.min(100, Math.max(0, a/b*100)).toFixed(1)+'%' : '0%';
+
+  const defs = [
+    { id:'rev', key:'売上高',           colorOk:'var(--navy)' },
+    { id:'gp',  key:'売上総損益金額',    colorOk:'var(--green)' },
+    { id:'op',  key:'営業損益金額',      colorOk:'var(--orange)' },
+  ];
+
+  defs.forEach(({id, key}) => {
+    const a = act(key), b = bud(key), r = rate(a,b);
+    const vEl = document.getElementById(`plk-${id}`);
+    const bEl = document.getElementById(`plk-${id}-bud`);
+    const rEl = document.getElementById(`plk-${id}-rate`);
+    const barEl = document.getElementById(`plk-${id}-bar`);
+    if (vEl) { vEl.textContent = F2(a); vEl.style.color = a<0?'var(--red)':''; }
+    if (bEl) bEl.textContent = b ? F2(b) : '-';
+    if (rEl) { rEl.textContent = r; rEl.style.color = (b&&a>=b)?'var(--green)':'var(--red)'; }
+    if (barEl) barEl.style.width = barW(a,b);
+  });
+}
+
+function renderPL2KPIs() {
+  // Re-render just the KPI numbers (not chart) for period mode
+  const { bsData } = S;
+  if (!bsData) return;
+  const idxList = S.plSelPeriod ? PERIOD_MONTHS[S.plSelPeriod] : [(S.plSelMonth||1)-1];
+  const lastIdx = idxList[idxList.length-1];
+  const firstIdx = idxList[0];
+  const cashArr = getCash();
+  const cash = cashArr[lastIdx];
+  const prevCash = firstIdx > 0 ? cashArr[firstIdx-1] : 0;
+  const burn = prevCash - cash; // 正=バーン（現預金減）
+  const avgBurn = (() => {
+    const bs = [];
+    for (let i=Math.max(0,lastIdx-2); i<=lastIdx; i++) {
+      const bc = (i>0?bsData.cash[i-1]:0) - bsData.cash[i];
+      if (bc > 0) bs.push(bc);
+    }
+    return bs.length ? bs.reduce((s,v)=>s+v,0)/bs.length : 0;
+  })();
+  const runway = avgBurn>0 ? (cash/avgBurn).toFixed(1) : '∞';
+  const cashEl = document.getElementById('pl2-cash');
+  const burnEl = document.getElementById('pl2-burn');
+  const runEl  = document.getElementById('pl2-runway');
+  if (cashEl) cashEl.textContent = F2(cash);
+  if (burnEl) {
+    /* burn=prevCash-cash: 正=バーン(減)、負=現預金増 → 増のときプラス表示 */
+    /* burn=prevCash-cash: 正=バーン(現預金減)、負=現預金増 */
+    burnEl.textContent = burn < 0
+      ? '-' + F2(Math.abs(burn))   // 現預金増 → マイナス表示
+      : F2(burn);                  // バーン → プラス表示（緑なし）
+    burnEl.style.color = burn>0?'var(--red)':burn<0?'var(--green)':'var(--muted)';
+  }
+  if (runEl) {
+    runEl.textContent = runway==='∞'?'∞ ヶ月':runway+'ヶ月';
+    runEl.style.color = parseFloat(runway)>6?'var(--green)':parseFloat(runway)>3?'var(--orange)':'var(--red)';
+  }
+}
+
+function renderPLDetail() {
+  const { yojitsu, bsData } = S;
+  if (!yojitsu && !bsData) return;
+
+  // Build month buttons
+  buildMonthButtons();
+  if (!S.plSelMonth) S.plSelMonth = getLatestDataMonth();
+  if (!S.plSelPeriod) S.plSelPeriod = null;
+  if (!S.plMode) S.plMode = 'actual';
+  setPLMode(S.plMode);
+  updateMonthButtonActive();
+  updatePLBadge();
+  renderPLKPIBoxes();
+  renderPL1();
+  renderPL2();
+  renderPL3();
+}
+
+function getLatestDataMonth() {
+  // Find last month with actual revenue data
+  const rev = S.yojitsu?.rawByKey?.['売上高'] || S.pl?.revenue || [];
+  let last = 1;
+  rev.forEach((v,i) => { if (v && v !== 0) last = i+1; });
+  return last;
+}
+
+function buildMonthButtons() {
+  const container = document.getElementById('pl-month-btns');
+  if (!container) return;
+  container.innerHTML = MONTH_NAMES.map((m,i) =>
+    `<button type="button" class="pl-month-btn" data-m="${i+1}" onclick="selectPLMonth(${i+1})">${m}</button>`
+  ).join('');
+}
+
+function updateMonthButtonActive() {
+  document.querySelectorAll('.pl-month-btn').forEach(btn => {
+    btn.classList.toggle('active', +btn.dataset.m === S.plSelMonth);
+  });
+  const badge = document.getElementById('pl-selected-month-badge');
+  if (badge) badge.textContent = `2026年${S.plSelMonth}月`;
+}
+
+function selectPLMonth(m) {
+  S.plSelMonth = m;
+  S.plSelPeriod = null;  // 期間選択クリア
+  document.querySelectorAll('.pl-period-btn').forEach(b=>b.classList.remove('active'));
+  updateMonthButtonActive();
+  updatePLBadge();
+  renderPLKPIBoxes();
+  renderPL1();
+  renderPL2KPIs();
+  closeDrill();
+}
+
+/* ① PL P/L形式サマリー */
+function renderPL1() {
+  const { yojitsu } = S;
+  const el = document.getElementById('pl1-tbl');
+  if (!el || !yojitsu) { if(el) el.innerHTML='<div class="empty-msg">予実管理シートを読み込んでください</div>'; return; }
+  const idxList = S.plSelPeriod ? PERIOD_MONTHS[S.plSelPeriod] : [(S.plSelMonth||1)-1];
+  const mi = idxList[idxList.length-1]; // 末月インデックス
+
+  /* ── 月次クローズ判定 ──
+     販売管理費 計のactual列が0以外なら「月次確定（実績）」、0なら「Forecast」 */
+  function isMonthClosed(idx) {
+    const sga = yojitsu.rawByKey?.['販売管理費 計'];
+    if (!sga) return false;
+    return (sga[idx] || 0) !== 0;
+  }
+
+  /* 期間選択時：期間内の最終月で判定、月選択時：その月で判定 */
+  const closed = S.plSelPeriod
+    ? isMonthClosed(idxList[idxList.length - 1])
+    : isMonthClosed(idxList[0]);
+
+  /* actualLabel / badge の決定:
+     地の文字: 確定済み=「実績」、未確定=「Forecast」
+     バッジ: 確定済み=緑「確定」、Actualモードで未確定=青「予測」、Forecastモードで未確定=橙「見込」 */
+  const actualLabel = closed ? '実績' : 'Forecast';
+  const actualBadge = closed
+    ? `<span style="font-size:9px;background:#1E7D4A;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">確定</span>`
+    : S.plMode === 'actual'
+      ? `<span style="font-size:9px;background:#2A4FAF;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">予測</span>`
+      : `<span style="font-size:9px;background:#D0480A;color:#fff;padding:1px 5px;border-radius:3px;margin-left:4px">見込</span>`;
+
+  /* ── 前月インデックスリスト ──
+     期間選択時：その期間の1つ前の同一長の期間
+     月選択時  ：前月1ヶ月 */
+  function getPrevIdxList(idxList) {
+    if (S.plSelPeriod) {
+      const len = idxList.length;
+      const start = idxList[0];
+      if (start < len) return null; // 前期間がない
+      return idxList.map(i => i - len);
+    } else {
+      const m = idxList[0];
+      return m > 0 ? [m - 1] : null;
+    }
+  }
+  const prevIdxList = getPrevIdxList(idxList);
+
+  const getAct     = (key, idx) => sumAcross(S.yojitsu?.rawByKey?.[key], idx);
+  const getBud     = (key, idx) => sumAcross(S.yojitsu?.budByKey?.[key], idx);
+  const getFC      = (key, idx) => sumAcross(S.yojitsu?.fcByKey?.[key], idx);
+
+  /* 列ラベル */
+  const prevLabel = S.plSelPeriod
+    ? `前${S.plSelPeriod}`
+    : (prevIdxList ? `前月(${MONTH_NAMES[prevIdxList[0]]})` : '前月');
+
+  let html = `<table class="pl1-tbl"><thead><tr>
+    <th style="width:150px">科目</th>
+    <th>予算</th>
+    <th>${actualLabel}${actualBadge}</th>
+    <th title="${actualLabel}－予算">予算差</th>
+    <th style="width:62px" title="${actualLabel}÷予算×100">予算比</th>
+    <th title="前月差">前月差</th>
+    <th style="width:62px" title="前月比">前月比</th>
+  </tr></thead><tbody>`;
+
+  /* パイプライン加算対象キー（売上→利益まで全段階） */
+  const PIPE_KEYS = new Set([
+    '売上高','売上高 計',
+    '売上総損益金額',
+    '営業損益金額',
+    '経常損益金額',
+    '税引前当期純損益金額',
+    '当期純損益金額',
+  ]);
+
+  /* 行ごとの計算ヘルパー */
+  function calcRow(key, isOther, customActArr) {
+    /* 確定済み月 → rawByKey（実績）、未確定月 → fcByKey（Forecast）*/
+    const rawArr = isOther ? yojitsu.rawByKey['__other'] : (S.yojitsu?.rawByKey?.[key] || Array(12).fill(0));
+    const fcBase = isOther ? Array(12).fill(0) : (yojitsu.fcByKey?.[key] || yojitsu.budByKey?.[key] || Array(12).fill(0));
+
+    /* 未確定月 + 売上/利益系キー → パイプライン月別金額を加算 */
+    const pipeMonthly = (!closed && !isOther && PIPE_KEYS.has(key))
+      ? getPipeMonthlyTotal()
+      : Array(12).fill(0);
+    const fcArr = fcBase.map((v, i) => v + pipeMonthly[i]);
+
+    const actArr = customActArr || (closed ? rawArr : fcArr);
+    const budArr = isOther ? null : yojitsu.budByKey[key];
+
+    const act     = sumAcross(actArr, idxList);
+    const bud     = isOther ? 0 : sumAcross(budArr, idxList);
+    const prevAct = prevIdxList ? sumAcross(actArr, prevIdxList) : null;
+
+    // 予算差・予算比（予算比：実績÷予算×100）
+    const yojitsuDiff = bud !== 0 ? act - bud : null;
+    let yojitsuRate = '0.0%';
+    if (bud !== 0) {
+      yojitsuRate = (act / Math.abs(bud) * 100).toFixed(1) + '%';
+    }
+
+    // 前月差・前月比（前月比：今月÷前月×100）
+    const prevDiff = prevAct !== null ? act - prevAct : null;
+    let prevRate = '-';
+    if (prevAct !== null && prevAct !== 0) {
+      prevRate = (act / Math.abs(prevAct) * 100).toFixed(1) + '%';
+    }
+
+    return { act, bud, yojitsuDiff, yojitsuRate, prevAct, prevDiff, prevRate };
+  }
+
+  yojitsu.plRows.forEach(row => {
+    /* 利益率行 */
+    if (row.isRate) {
+      const numer = sumAcross(getPLArr(row.numer), idxList);
+      const denom = sumAcross(getPLArr(row.denom), idxList);
+      const budNumer = sumAcross(yojitsu.budByKey[row.numer], idxList);
+      const budDenom = sumAcross(yojitsu.budByKey[row.denom], idxList);
+      const actRate = denom ? (numer / denom * 100) : 0;
+      const budRate = budDenom ? (budNumer / budDenom * 100) : 0;
+      const diff = actRate - budRate;
+      const rateCol = actRate >= 0 ? 'var(--green)' : 'var(--red)';
+      html += `<tr style="background:#F9FAFD">
+        <td style="padding-left:16px;color:var(--muted);font-size:10px">${row.label}</td>
+        <td class="num" style="color:var(--muted);font-size:10px">${budRate ? budRate.toFixed(1)+'%' : '-'}</td>
+        <td class="num" style="font-weight:600;font-size:10px;color:${rateCol}">${actRate.toFixed(1)}%</td>
+        <td class="num" style="font-size:10px;color:${diff>=0?'var(--green)':'var(--red)'}">${budRate?diff.toFixed(1)+'pt':'-'}</td>
+        <td colspan="3" style="color:var(--muted);font-size:10px"></td>
+      </tr>`;
+      return;
+    }
+
+
+    const isExpense = ['外注費','交際費','会議費','旅費交通費','__other','販売管理費 計'].includes(row.key);
+    const isOther   = row.key === '__other';
+    const { act, bud, yojitsuDiff, yojitsuRate, prevDiff, prevRate } = calcRow(row.key, isOther);
+
+    const yjDiffClass = isExpense ? numClass(yojitsuDiff, true) : numClass(yojitsuDiff, false);
+    const pvDiffClass = isExpense ? numClass(prevDiff, true)    : numClass(prevDiff, false);
+
+    const rowClass = row.isSummary ? 'summary-row' : (row.level===1 ? 'sub-row' : '');
+    const drillKey = isOther ? null : row.key;
+    const drillBtn = (drillKey && S.glData && S.plMode==='actual')
+      ? `<button class="pl1-drillbtn" onclick="openDrill('${drillKey}',${S.plSelMonth})">元帳</button>` : '';
+
+    html += `<tr class="${rowClass}">
+      <td>${row.label} ${drillBtn}</td>
+      <td class="num">${FC(bud)}</td>
+      <td class="num ${act<0?'neg':''}">${FC(act)}</td>
+      <td class="num ${yjDiffClass}">${FCD(yojitsuDiff)}</td>
+      <td class="num">${yojitsuRate}</td>
+      <td class="num ${pvDiffClass}">${prevDiff!==null ? FC(prevDiff) : '-'}</td>
+      <td class="num">${prevRate}</td>
+    </tr>`;
+
+    // その他経費展開時
+    if (row.isOtherHead && S.pl3Expand) {
+      yojitsu.otherDetailRows.forEach(dr => {
+        const otherData = S.plMode === 'forecast'
+          ? (dr.budget && dr.budget.some(v=>v) ? dr.budget : dr.actual)
+          : dr.actual;
+        const da = sumAcross(otherData, idxList);
+        const db = sumAcross(dr.budget, idxList);
+        const dPrevAct = prevIdxList ? sumAcross(otherData, prevIdxList) : null;
+        const dYjDiff  = db !== 0 ? da - db : null;
+        const dYjRate  = db !== 0 ? (da / Math.abs(db) * 100).toFixed(1) + '%' : '-';
+        const dPvDiff  = dPrevAct !== null ? da - dPrevAct : null;
+        const dPvRate  = (dPrevAct !== null && dPrevAct !== 0) ? (da / Math.abs(dPrevAct) * 100).toFixed(1) + '%' : '-';
+        const dKey = dr.label;
+        const dBtn = (S.glData && S.plMode==='actual')
+          ? `<button class="pl1-drillbtn" onclick="openDrill('${dKey}',${S.plSelMonth})">元帳</button>` : '';
+        const dfc = sumAcross(closed ? dr.actual : (dr.fc || dr.budget), idxList);
+        html += `<tr class="other-sub-row">
+          <td>${dr.label} ${dBtn}</td>
+          <td class="num">${FC(db)}</td>
+          <td class="num">${FC(dfc)}</td>
+          <td class="num ${numClass(dYjDiff,true)}">${FCD(dYjDiff)}</td>
+          <td class="num">${dYjRate}</td>
+          <td class="num ${numClass(dPvDiff,true)}">${FCD(dPvDiff)}</td>
+          <td class="num">${dPvRate}</td>
+        </tr>`;
+      });
+    }
+  });
+
+  html += `</tbody></table>`;
+  el.innerHTML = html;
+}
+
+/* ② Runway KPIs + chart */
+function renderPL2() {
+  const { bsData } = S;
+  const cashEl = document.getElementById('pl2-cash');
+  const burnEl = document.getElementById('pl2-burn');
+  const runEl  = document.getElementById('pl2-runway');
+  if (!bsData) {
+    [cashEl,burnEl,runEl].forEach(e=>{ if(e) e.textContent='--'; });
+    return;
+  }
+  const idxList2 = S.plSelPeriod ? PERIOD_MONTHS[S.plSelPeriod] : [(S.plSelMonth||1)-1];
+  const mi = idxList2[idxList2.length-1];
+  const cashArr2 = getCash();
+  const cash = cashArr2[mi];
+  const prevCash = mi>0 ? cashArr2[mi-1] : 0;
+  const burn = prevCash - cash; // 正 = 燃焼（現預金減）、負 = 現預金増加
+
+  // 3-month avg burn
+  const burns = [];
+  for (let i=Math.max(0,mi-2); i<=mi; i++) {
+    const bc = bsData.cash[i] - (i>0?bsData.cash[i-1]:0);
+    if (bc < 0) burns.push(Math.abs(bc));
+  }
+  const avgBurn = burns.length ? burns.reduce((s,v)=>s+v,0)/burns.length : 0;
+  const runway = avgBurn > 0 ? (cash/avgBurn).toFixed(1) : '∞';
+
+  if (cashEl) { cashEl.textContent = F2(cash); cashEl.className = 'kpi-val'; }
+  if (burnEl) {
+    burnEl.textContent = (burn>=0?'':'+') + F2(-burn);  // 正=燃焼→赤、負=増加→緑
+    burnEl.style.color = burn>0 ? 'var(--red)' : burn<0 ? 'var(--green)' : 'var(--muted)';
+  }
+  if (runEl) {
+    runEl.textContent = runway==='∞' ? '∞ ヶ月' : runway+'ヶ月';
+    runEl.style.color = parseFloat(runway)>6 ? 'var(--green)' : parseFloat(runway)>3 ? 'var(--orange)' : 'var(--red)';
+  }
+
+  // Chart ②
+  if (charts.pl2) { charts.pl2.destroy(); charts.pl2=null; }
+  const labels = MONTH_NAMES.slice(0, 12);
+  const cashData = getCash();
+  const burnData = bsData.cash.map((v,i) => i===0 ? 0 : v-bsData.cash[i-1]); // 正=現預金増(緑)
+
+  charts.pl2 = new Chart(document.getElementById('pl2-chart'), {
+    data: {
+      labels,
+      datasets: [
+        { type:'bar', label:'月次キャッシュ増減', data:burnData, order:2,
+          backgroundColor: burnData.map(v=>v>=0?'rgba(30,125,74,.6)':'rgba(192,57,43,.6)'),
+          borderColor: burnData.map(v=>v>=0?'#1E7D4A':'#C0392B'), borderWidth:1 },
+        { type:'line', label:'現預金残高', data:cashData, order:1,
+          borderColor:'#1C2D6B', borderWidth:2.5, pointRadius:3, pointBackgroundColor:'#1C2D6B', fill:false }
+      ]
+    },
+    options: {
+      responsive:true, maintainAspectRatio:true,
+      plugins:{ legend:{labels:{boxWidth:12,padding:10}},
+        tooltip:{ callbacks:{ label:c=>c.dataset.label+': ¥'+c.raw.toLocaleString('ja-JP') } } },
+      scales:{
+        x:{ grid:{color:'#E8EBF4'} },
+        y:{ grid:{color:'#E8EBF4'}, ticks:{callback:v=>'¥'+(v/10000).toFixed(0)+'万'} }
+      }
+    }
+  });
+}
+
+/* ③ 月次P/L横並び */
+function renderPL3() {
+  const { yojitsu, bsData } = S;
+  const el = document.getElementById('pl3-tbl');
+  if (!el) return;
+  if (!yojitsu) { el.innerHTML='<div class="empty-msg">予実管理シートを読み込んでください</div>'; return; }
+
+  const latestM = getLatestDataMonth();
+  const gl = S.glData;
+
+  let tbl = '<table class="pl3-tbl"><thead><tr>';
+  tbl += '<th>科目</th>';
+  MONTH_NAMES.forEach(m => tbl += `<th>${m}</th>`);
+  tbl += '</tr></thead><tbody>';
+
+  const addRow = (label, key, cls, isOtherHead, actualArr, canDrill) => {
+    const rowClass = ['pl3-row', cls].join(' ');
+    tbl += `<tr class="${rowClass}">`;
+    let firstTd = label;
+    if (isOtherHead) firstTd = `<span onclick="togglePL3Other()" style="cursor:pointer">${label} ${S.pl3Expand?'▲':'▼'}</span>`;
+    tbl += `<td class="${cls.includes('other-head')?'pl3-other-head':''}">${firstTd}</td>`;
+    for (let mi=0; mi<12; mi++) {
+      const v = actualArr[mi];
+      const hasData = mi < latestM;
+      const cellClass = [
+        canDrill ? 'cell-clickable' : '',
+        hasData ? 'has-data' : 'no-data',
+        v<0?'neg': v>0?'':'',
+      ].filter(Boolean).join(' ');
+      const displayKey = key==='__other'? '__other_drill' : key;
+      const onclk = canDrill ? `onclick="openDrill('${key}',${mi+1})"` : '';
+      tbl += `<td class="${cellClass}" ${onclk}>${FC(v)}</td>`;
+    }
+    tbl += '</tr>';
+  };
+
+  const yd = yojitsu;
+  // 売上高
+  addRow('売上高', '売上高', 'pl3-header', false, getPLArr('売上高'), true);
+  // 売上総利益
+  addRow('売上総損益', '売上総損益金額', 'pl3-summary', false, getPLArr('売上総損益金額'), false);
+  // SGA header
+  tbl += `<tr class="pl3-row pl3-header"><td colspan="13">販売管理費</td></tr>`;
+  ['外注費','旅費交通費','会議費','交際費'].forEach(k => {
+    addRow('　'+k, k, 'pl3-sub', false, yd.rawByKey[k]||Array(12).fill(0), true);
+  });
+  // その他経費
+  addRow('　その他経費', '__other', 'pl3-other-head', true, getPLArr('__other'), false);
+  if (S.pl3Expand) {
+    yd.otherDetailRows.forEach(dr => {
+      tbl += `<tr class="pl3-row pl3-other-detail"><td>${dr.label}</td>`;
+      for (let mi=0;mi<12;mi++) {
+        const arr = S.plMode==='forecast' && dr.budget?.some?.(v=>v) ? dr.budget : dr.actual;
+        const v=arr[mi]||0;
+        const onclk = (gl && S.plMode==='actual') ? `onclick="openDrill('${dr.label}',${mi+1})"` : '';
+        tbl += `<td class="cell-clickable" ${onclk}>${FC(v)}</td>`;
+      }
+      tbl += '</tr>';
+    });
+  }
+  // 販管費計
+  addRow('販管費 計', '販売管理費 計', 'pl3-summary', false, getPLArr('販売管理費 計'), false);
+  // 営業利益
+  addRow('営業利益', '営業損益金額', 'pl3-summary', false, getPLArr('営業損益金額'), false);
+  // 当期純損益
+  addRow('当期純損益', '当期純損益金額', 'pl3-summary', false, getPLArr('当期純損益金額'), false);
+
+  // 現預金（BSデータ）
+  if (bsData) {
+    tbl += `<tr class="pl3-row pl3-cash"><td>現預金残高（BS）</td>`;
+    getCash().forEach(v => { tbl += `<td>${FC(v)}</td>`; });
+    tbl += '</tr>';
+  }
+
+  tbl += '</tbody></table>';
+  el.innerHTML = tbl;
+}
+
+function togglePL3Other() {
+  S.pl3Expand = !S.pl3Expand;
+  renderPL1();
+  renderPL3();
+}
+
+/* ④ ドリルスルー */
+function openDrill(account, month) {
+  const gl = S.glData;
+  const card = document.getElementById('pl4-card');
+  const title = document.getElementById('pl4-title');
+  const thead = document.getElementById('pl4-thead');
+  const tbody = document.getElementById('pl4-tbody');
+  const empty = document.getElementById('pl4-empty');
+  if (!card) return;
+
+  /* Forecastモードではドリルスルー不可 */
+  if (S.plMode === 'forecast') {
+    card.style.display = 'block';
+    card.scrollIntoView({behavior:'smooth', block:'nearest'});
+    title.textContent = '⚠ ドリルスルーは Actual（実績）モードのみ利用可能です';
+    thead.innerHTML = ''; tbody.innerHTML = '';
+    if (empty) empty.style.display = 'none';
+    card.querySelector('.card-body').innerHTML =
+      '<div class="empty-msg" style="padding:24px;color:var(--orange)">📊 左上の「Actual（実績）」ボタンに切り替えると総勘定元帳の仕訳明細を確認できます</div>';
+    return;
+  }
+
+  card.style.display = 'block';
+  card.scrollIntoView({behavior:'smooth', block:'nearest'});
+
+  if (!gl) {
+    title.textContent = 'ドリルスルー — 総勘定元帳データが未読み込みです';
+    thead.innerHTML = '';
+    tbody.innerHTML = '';
+    empty.textContent = '総勘定元帳シートを含むExcelファイルを読み込むと、ここに取引明細が表示されます。';
+    empty.style.display = 'block';
+    return;
+  }
+
+  const accountLabel = account==='__other' ? 'その他経費' : account;
+  title.textContent = `${MONTH_NAMES[month-1]} ／ ${accountLabel} — 仕訳明細（総勘定元帳）`;
+
+  let entries;
+  if (account==='__other') {
+    const excl = new Set(['外注費','交際費','会議費','旅費交通費']);
+    entries = gl.filter(e => e.月===month && !excl.has(e.科目)
+      && !['住信ＳＢＩネット（法人）','売掛金','未払金','仮払消費税','資本金','立替金','預け金'].includes(e.科目));
+  } else {
+    entries = gl.filter(e => e.科目===account && e.月===month);
+  }
+
+  thead.innerHTML = `<tr>
+    <th>取引日</th><th>勘定科目</th><th>相手勘定科目</th><th>備考</th>
+    <th class="num">借方金額</th><th class="num">貸方金額</th><th class="num">貸借差額</th>
+  </tr>`;
+
+  if (entries.length===0) {
+    tbody.innerHTML = '';
+    empty.style.display = 'block';
+  } else {
+    empty.style.display = 'none';
+    const totDebit = entries.reduce((s,e)=>s+e.借方,0);
+    const totCredit = entries.reduce((s,e)=>s+e.貸方,0);
+    const totDiff = entries.reduce((s,e)=>s+e.差額,0);
+
+    tbody.innerHTML = entries.map(e => `<tr>
+      <td>${e.日付}</td>
+      <td>${e.科目}</td>
+      <td>${e.相手勘定}</td>
+      <td>${e.備考||'-'}</td>
+      <td class="num">${e.借方?e.借方.toLocaleString('ja-JP'):'-'}</td>
+      <td class="num">${e.貸方?e.貸方.toLocaleString('ja-JP'):'-'}</td>
+      <td class="num ${e.差額>0?'pos':e.差額<0?'neg':''}">${e.差額.toLocaleString('ja-JP')}</td>
+    </tr>`).join('') +
+    `<tr style="background:var(--navy-pale);font-weight:700;border-top:2px solid var(--navy)">
+      <td colspan="4">合計（${entries.length}件）</td>
+      <td class="num">${totDebit.toLocaleString('ja-JP')}</td>
+      <td class="num">${totCredit.toLocaleString('ja-JP')}</td>
+      <td class="num ${totDiff>0?'pos':totDiff<0?'neg':''}">${totDiff.toLocaleString('ja-JP')}</td>
+    </tr>`;
+  }
+}
+
+function closeDrill() {
+  const card = document.getElementById('pl4-card');
+  if (card) card.style.display = 'none';
+}
+
+function waitLibs(cb) {
+  if (typeof XLSX !== 'undefined' && typeof Chart !== 'undefined') cb();
+  else setTimeout(() => waitLibs(cb), 80);
+}
+waitLibs(init);
+</script>
+</body>
+</html>
