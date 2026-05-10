@@ -1343,12 +1343,9 @@ function onPipeChange() {
   if (el) el.textContent = F(tot);
   /* ④工数連動 */
   syncPipeToProj();
-  /* PLページが表示中なら予実サマリーも更新（パイプライン→売上Forecast連動） */
-  const plPage = document.getElementById('page-pl');
-  if (plPage && plPage.style.display !== 'none') {
-    renderPL1();
-    renderPLKPIBoxes();
-  }
+  /* PLサマリーを常に再計算（パイプライン→売上Forecast連動） */
+  renderPL1();
+  renderPLKPIBoxes();
 }
 
 function togglePipeDetail() {
@@ -2354,8 +2351,21 @@ function parseYojitsuSplit(actualSheet, budgetSheet) {
   });
 
   rawByKey['__other'] = otherSGA;
-  budByKey['__other'] = Array(12).fill(0);
-  fcByKey['__other']  = Array(12).fill(0);
+
+  /* 予算・FCのその他経費 = 販管費計 - 主要SGA項目（負にならないようmax(0,...）） */
+  const mainSGA_bud = OTHER_SGA_EXCL.reduce((acc, k) => {
+    if (budByKey[k]) acc = acc.map((v,i) => v + budByKey[k][i]);
+    return acc;
+  }, Array(12).fill(0));
+  budByKey['__other'] = (budByKey['販売管理費 計'] || Array(12).fill(0))
+    .map((v,i) => Math.max(0, v - mainSGA_bud[i]));
+
+  const mainSGA_fc = OTHER_SGA_EXCL.reduce((acc, k) => {
+    if (fcByKey[k]) acc = acc.map((v,i) => v + fcByKey[k][i]);
+    return acc;
+  }, Array(12).fill(0));
+  fcByKey['__other'] = (fcByKey['販売管理費 計'] || Array(12).fill(0))
+    .map((v,i) => Math.max(0, v - mainSGA_fc[i]));
 
   const PL_ROWS_LOCAL = [
     {label:'売上高',       key:'売上高',           level:0, isHeader:false, isSummary:false},
@@ -2445,7 +2455,14 @@ function parseYojitsu(sheet) {
   });
 
   rawByKey['__other'] = otherSGA;
-  budByKey['__other'] = Array(12).fill(0);
+
+  /* 予算のその他経費 = 販管費計 - 主要SGA項目 */
+  const mainSGA_bud2 = OTHER_SGA_EXCL.reduce((acc, k) => {
+    if (budByKey[k]) acc = acc.map((v,i) => v + budByKey[k][i]);
+    return acc;
+  }, Array(12).fill(0));
+  budByKey['__other'] = (budByKey['販売管理費 計'] || Array(12).fill(0))
+    .map((v,i) => Math.max(0, v - mainSGA_bud2[i]));
 
   /* 旧形式では予算列をForecastとして兼用 */
   const fcByKey = budByKey;
@@ -2661,10 +2678,16 @@ function renderPLKPIBoxes() {
     ? isIdxClosed(idxList[idxList.length-1])
     : isIdxClosed(idxList[0]);
 
-  /* パイプライン月別加算（未確定月のみ） */
-  const pipeKeys = new Set(['売上高','売上高 計','売上総損益金額','営業損益金額','経常損益金額','当期純損益金額']);
+  /* パイプライン加算係数（renderPL1と同じ定義） */
+  const PF = {
+    '売上高': 1, '売上高 計': 1, '売上総損益金額': 1,
+    '外注費': 0.5,
+  };
   const pipeArr = getPipeMonthlyTotal();
-  const pipeAdd = (k) => (!selClosed && pipeKeys.has(k)) ? sumAcross(pipeArr, idxList) : 0;
+  const pipeAdd = (k) => {
+    const f = (!selClosed && PF[k] !== undefined) ? PF[k] : 0;
+    return f !== 0 ? sumAcross(pipeArr, idxList) * f : 0;
+  };
 
   const act = k => sumAcross(getPLArr(k), idxList) + pipeAdd(k);
   const bud = k => sumAcross(yd.budByKey[k], idxList);
@@ -2848,33 +2871,30 @@ function renderPL1() {
     <th style="width:62px" title="前月比">前月比</th>
   </tr></thead><tbody>`;
 
-  /* パイプライン加算対象キー（売上→利益まで全段階） */
-  const PIPE_KEYS = new Set([
-    '売上高','売上高 計',
-    '売上総損益金額',
-    '営業損益金額',
-    '経常損益金額',
-    '税引前当期純損益金額',
-    '当期純損益金額',
-  ]);
+  /* パイプライン加算係数 — 外注費のみ50%原価率で増加、他は変更なし */
+  const PIPE_COST_RATE = 0.5;
+  const PIPE_FACTOR = {
+    '売上高': 1, '売上高 計': 1, '売上総損益金額': 1,
+    '外注費': PIPE_COST_RATE,
+  };
 
   /* 行ごとの計算ヘルパー */
   function calcRow(key, isOther, customActArr) {
-    /* 確定済み月 → rawByKey（実績）、未確定月 → fcByKey（Forecast）*/
     const rawArr = isOther ? yojitsu.rawByKey['__other'] : (S.yojitsu?.rawByKey?.[key] || Array(12).fill(0));
-    const fcBase = isOther ? Array(12).fill(0) : (yojitsu.fcByKey?.[key] || yojitsu.budByKey?.[key] || Array(12).fill(0));
+    const fcBase = isOther
+      ? (yojitsu.fcByKey?.['__other'] || Array(12).fill(0))
+      : (yojitsu.fcByKey?.[key] || yojitsu.budByKey?.[key] || Array(12).fill(0));
 
-    /* 未確定月 + 売上/利益系キー → パイプライン月別金額を加算 */
-    const pipeMonthly = (!closed && !isOther && PIPE_KEYS.has(key))
-      ? getPipeMonthlyTotal()
-      : Array(12).fill(0);
-    const fcArr = fcBase.map((v, i) => v + pipeMonthly[i]);
+    /* 未確定月 + 対象キー → パイプライン月別金額を係数倍して加算 */
+    const factor = (!closed && !isOther) ? (PIPE_FACTOR[key] ?? 0) : 0;
+    const pipeArr = factor !== 0 ? getPipeMonthlyTotal() : null;
+    const fcArr = fcBase.map((v, i) => v + (pipeArr ? pipeArr[i] * factor : 0));
 
     const actArr = customActArr || (closed ? rawArr : fcArr);
-    const budArr = isOther ? null : yojitsu.budByKey[key];
+    const budArr = isOther ? (yojitsu.budByKey['__other'] || Array(12).fill(0)) : yojitsu.budByKey[key];
 
     const act     = sumAcross(actArr, idxList);
-    const bud     = isOther ? 0 : sumAcross(budArr, idxList);
+    const bud     = sumAcross(budArr, idxList);
     const prevAct = prevIdxList ? sumAcross(actArr, prevIdxList) : null;
 
     // 予算差・予算比（予算比：実績÷予算×100）
