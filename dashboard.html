@@ -406,7 +406,7 @@ body { background:var(--bg); color:var(--text); font-family:'Hiragino Sans','Yu 
 
   window.doLogout = function() {
     sessionStorage.removeItem(SESSION_KEY);
-    /* ログイン画面を再生成して表示 */
+    localStorage.clear();
     location.reload();
   };
 
